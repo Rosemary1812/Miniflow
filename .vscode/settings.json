@@ -1,0 +1,16 @@
+{
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "files.eol": "\n",
+
+  "editor.codeActionsOnSave": {
+    "source.fixAll": "always",
+    "source.fixAll.eslint": "always"
+  },
+
+  // 关键：允许 ESLint 识别 Flat Config (eslint.config.mjs)
+  "eslint.useFlatConfig": true,
+
+  // 关键：指定哪些文件交给 ESLint 校验
+  "eslint.validate": ["javascript", "javascriptreact", "typescript", "typescriptreact"]
+}
