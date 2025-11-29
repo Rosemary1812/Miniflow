@@ -51,7 +51,7 @@ export default tseslint.config(
           trailingComma: 'all',
           arrowParens: 'avoid',
           bracketSpacing: true,
-          endOfLine: 'lf', // 确保行尾符一致
+          endOfLine: 'auto',
         },
       ],
       'no-console': ['warn', { allow: ['warn', 'error'] }],
