@@ -1,9 +1,19 @@
-import {withSentryConfig} from '@sentry/nextjs';
+import { withSentryConfig } from '@sentry/nextjs';
 // import './proxy';
 
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
+  devIndicators: false,
+  async redirects() {
+    return [
+      {
+        source: '/',
+        destination: '/workflows',
+        permanent: false,
+      },
+    ];
+  },
   // 确保 Prisma 运行时模块能被正确解析
   serverExternalPackages: ['@prisma/client'],
   experimental: {
@@ -16,9 +26,9 @@ export default withSentryConfig(nextConfig, {
   // For all available options, see:
   // https://www.npmjs.com/package/@sentry/webpack-plugin#options
 
-  org: "innsingt",
+  org: 'innsingt',
 
-  project: "n9n",
+  project: 'n9n',
 
   // Only print logs for uploading source maps in CI
   silent: !process.env.CI,
@@ -33,7 +43,7 @@ export default withSentryConfig(nextConfig, {
   // This can increase your server load as well as your hosting bill.
   // Note: Check that the configured route will not match with your Next.js middleware, otherwise reporting of client-
   // side errors will fail.
-  tunnelRoute: "/monitoring",
+  tunnelRoute: '/monitoring',
 
   // Automatically tree-shake Sentry logger statements to reduce bundle size
   disableLogger: true,
