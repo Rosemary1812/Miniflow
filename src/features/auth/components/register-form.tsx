@@ -119,7 +119,7 @@ export function RegisterForm() {
                     name="confirmPassword"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Confiem password</FormLabel>
+                        <FormLabel>Confirm password</FormLabel>
                         <FormControl>
                           <Input type="password" placeholder="******" {...field} />
                         </FormControl>
