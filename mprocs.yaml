@@ -1,5 +1,5 @@
 procs:
   inngest:
-    cmd: ["npm", "run", "inngest:dev"]
+    cmd: ["npm.cmd", "run", "inngest:dev"]
   web:
-    cmd: ["npm", "run", "dev"]
+    cmd: ["npm.cmd", "run", "dev"]
