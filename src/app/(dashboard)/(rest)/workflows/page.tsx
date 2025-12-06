@@ -1,5 +1,10 @@
 import { HydrateClient } from '@/app/trpc/server';
-import { WorkflowsList, WorkflowContainer } from '@/features/workflows/components/workflows';
+import {
+  WorkflowsList,
+  WorkflowContainer,
+  WorkflowsLoading,
+  WorkflowsError,
+} from '@/features/workflows/components/workflows';
 import type { SearchParams } from 'nuqs/server';
 import { prefetchWorkflows } from '@/features/workflows/server/prefetch';
 import { requireAuth } from '@/lib/auth-utils';
@@ -16,8 +21,8 @@ const Page = async ({ searchParams }: Props) => {
   return (
     <WorkflowContainer>
       <HydrateClient>
-        <ErrorBoundary fallback={<p>Error!</p>}>
-          <Suspense fallback={<p>Loading...</p>}>
+        <ErrorBoundary fallback={<WorkflowsError />}>
+          <Suspense fallback={<WorkflowsLoading />}>
             <WorkflowsList />
           </Suspense>
         </ErrorBoundary>
