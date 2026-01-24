@@ -38,7 +38,7 @@
   - `trpc/server.tsx`：服务端工具；`createTRPCOptionsProxy`、`prefetch`（支持 infinite/普通查询）与 `HydrateClient`。
   - `trpc/query-client.ts`：`QueryClient` 默认配置与脱水策略。
   - `trpc/init.ts`：`createTRPCContext`、`protectedProcedure`（需要会话）、`premiumProcedure`（需要有效订阅）。
-  - `trpc/routers/_app.ts`：聚合 `workflowRouter` 并导出 `AppRouter` 类型。
+  - `trpc/routers/_app.ts`：tRPC 主路由聚合文件，当前聚合 `workflowRouter`，导出 `AppRouter` 类型供客户端类型推导使用。
 
 - `src/components`
   - `app-header.tsx`：非侧边栏头部。
@@ -48,41 +48,41 @@
   - `components/ui/*`：设计系统基础件（Button、Input、Table、Sidebar、Dialog、Tooltip、Chart 等）。
 
 - `src/features/auth`
-  - `components/layout.tsx`：认证页布局。
-  - `components/login-form.tsx`：登录表单。
-  - `components/register-form.tsx`：注册表单。
+  - `components/layout.tsx`：认证页面布局组件，提供统一的认证页面容器样式。
+  - `components/login-form.tsx`：登录表单组件（客户端组件），使用 React Hook Form + Zod 验证，调用 `authClient.signIn.email()` 进行登录，成功时跳转到首页，失败时显示错误提示（使用 Sonner Toast）。
+  - `components/register-form.tsx`：注册表单组件（客户端组件），使用 React Hook Form + Zod 验证，调用 `authClient.signUp.email()` 进行注册，成功时自动登录并跳转。
 
 - `src/features/subscriptions`
-  - `hooks/use-subscription.ts`：`useSubscription` 与 `useHasActiveSubscription`，基于 Better Auth 客户端获取 Polar 订阅状态。
+  - `hooks/use-subscription.ts`：订阅状态查询 Hook，包含 `useSubscription`（查询用户订阅详情）、`useHasActiveSubscription`（判断是否有有效订阅并返回首个订阅信息），基于 Better Auth 客户端调用 Polar API 获取订阅状态。
 
 - `src/features/workflows`
-  - `components/workflows.tsx`：`WorkflowsList`、`WorkFlowsHeader`（含升级弹窗）、`WorkflowContainer`（容器）、`WorkflowSearch`（搜索框）。
-  - `hooks/use-workflows.ts`：`useSuspenseWorkflows`（Suspense 查询）、`useCreateWorkflow`（创建并刷新/跳转）。
-  - `hooks/use-workflows-params.ts`：`nuqs` 的查询参数绑定。
-  - `params.ts`：`workflowsParams`（分页、搜索参数）。
-  - `server/prefetch.ts`：工作流查询的服务端预取。
-  - `server/routers.ts`：`workflowRouter`（CRUD + `getMany` 分页搜索，`protectedProcedure`/`premiumProcedure`）。
-  - `server/params-loader.ts`：基于 `nuqs/server` 的参数加载。
+  - `components/workflows.tsx`：工作流相关组件，包含 `WorkflowsList`（列表展示）、`WorkFlowsHeader`（标题与"新建工作流"按钮，集成升级弹窗）、`WorkflowContainer`（页面容器，组合 header/search/pagination）、`WorkflowSearch`（搜索输入框，与 URL 参数联动）。
+  - `hooks/use-workflows.ts`：工作流数据查询 Hook，`useSuspenseWorkflows`（使用 Suspense 的查询，支持 SSR 注水）、`useCreateWorkflow`（创建 mutation，成功时刷新列表或跳转到编辑页）。
+  - `hooks/use-workflows-params.ts`：工作流查询参数 Hook，基于 `nuqs` 实现 URL 参数与状态同步（分页、搜索）。
+  - `params.ts`：工作流查询参数定义，使用 `nuqs/server` 的 `parseAsInteger` 和 `parseAsString`，包含 `page`、`pageSize`、`search`，默认值与清除策略。
+  - `server/prefetch.ts`：工作流查询的服务端预取函数，使用 tRPC `prefetch` 在 SSR 阶段预取数据，返回 `QueryClient` 用于客户端注水。
+  - `server/routers.ts`：工作流 tRPC 路由定义（`workflowRouter`），包含 `create`（`premiumProcedure`，使用 `random-word-slugs` 生成名称）、`remove`、`updateName`、`getOne`（`protectedProcedure`）、`getMany`（分页搜索，支持 `contains` 模糊查询）。
+  - `server/params-loader.ts`：基于 `nuqs/server` 的参数加载函数，从请求中解析 `workflowsParams`，返回参数对象供页面使用。
 
 - `src/hooks`
-  - `use-entity-search.tsx`：输入防抖与 URL 参数联动。
-  - `use-upgarde-modal.tsx`：捕获 `FORBIDDEN` 并控制升级弹窗。
-  - `use-mobile.ts`：移动端断点判断。
+  - `use-entity-search.tsx`：实体搜索 Hook，实现输入防抖（使用 `useDebouncedCallback`）与 URL 参数联动（基于 `nuqs`），用于列表页搜索功能。
+  - `use-upgarde-modal.tsx`：升级弹窗控制 Hook，捕获 tRPC `FORBIDDEN` 错误（通过 `TRPCClientError`），自动打开升级订阅对话框，导出 `handleError` 和 `modal` 供页面使用。
+  - `use-mobile.ts`：移动端断点判断 Hook，使用 `useMediaQuery` 检测屏幕宽度，用于响应式布局。
 
 - `src/lib`
-  - `db.ts`：PrismaClient 单例（开发环境复用）。
-  - `auth.ts`：Better Auth 服务端实例，接入 Polar：结账与客户门户。
-  - `auth-client.ts`：Better Auth 客户端实例，接入 Polar 插件。
-  - `auth-utils.ts`：`requireAuth` / `requireUnauth` 重定向工具。
-  - `polar.ts`：Polar SDK 客户端（沙箱）。
-  - `utils.ts`：通用工具。
+  - `db.ts`：PrismaClient 单例（开发环境通过全局变量复用，避免热重载创建多个实例）。
+  - `auth.ts`：Better Auth 服务端实例，配置 Prisma 适配器、邮箱密码认证，集成 Polar 插件（结账、客户门户、注册时自动创建客户）。
+  - `auth-client.ts`：Better Auth 客户端实例（`createAuthClient`），接入 Polar 前端插件，用于登录、注册、登出、结账、客户门户等操作。
+  - `auth-utils.ts`：认证工具函数，`requireAuth`（无会话时重定向到 `/login`）、`requireUnauth`（有会话时重定向到 `/workflows`），用于页面级鉴权控制。
+  - `polar.ts`：Polar SDK 客户端实例，使用环境变量 `POLAR_ACCESS_TOKEN` 初始化，用于查询订阅状态（在 `premiumProcedure` 中使用）。
+  - `utils.ts`：通用工具函数，包含 `cn()` 函数（使用 `clsx` 和 `tailwind-merge` 合并类名）。
 
 - `src/inngest`
-  - `client.ts`：Inngest 客户端。
-  - `functions.ts`：示例函数与 AI 步骤封装。
+  - `client.ts`：Inngest 客户端实例（`id: 'n9n'`），用于发送事件和注册函数。
+  - `functions.ts`：Inngest 函数定义，包含 `execute` 函数（事件：`execute/ai`），使用 `step.ai.wrap()` 封装 AI SDK 调用（支持 Google Gemini、OpenAI、DeepSeek、Anthropic 等多模型）。
 
 - `src/config`
-  - `constants.ts`：分页常量等。
+  - `constants.ts`：分页常量配置（`DEFAULT_PAGE: 1`、`DEFAULT_PAGE_SIZE: 5`、`MAX_PAGE_SIZE: 100`、`MIN_PAGE_SIZE: 1`），用于工作流列表分页与 tRPC 路由输入验证。
 
 - `src/generated/prisma`
   - Prisma Client 生成产物：`client.ts`、`models.ts`、`enums.ts`、`models/*.ts`、`internal/*`、`browser.ts`、`commonInputTypes.ts`、`query_engine-windows.dll.node` 等（请勿手改）。

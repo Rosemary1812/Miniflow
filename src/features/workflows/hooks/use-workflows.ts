@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { useWorkflowsParams } from './use-workflows-params';
 import { trpc } from '@/app/trpc/server';
+import { use } from 'react';
 
 export const useSuspenseWorkflows = () => {
   const trpc = useTRPC();
@@ -45,6 +46,30 @@ export const useRemoveWorkflow = () => {
       // onError: error => {
       //   toast.error(`Failed to remove workflow: ${error.message}`);
       // },
+    }),
+  );
+};
+
+export const useSuspenseWorkflow = (id: string) => {
+  const trpc = useTRPC();
+  return useSuspenseQuery(trpc.workflows.getOne.queryOptions({ id }));
+};
+
+// Hook to update workflow name
+export const useUpdateWorkflowName = () => {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const router = useRouter();
+  return useMutation(
+    trpc.workflows.updateName.mutationOptions({
+      onSuccess: data => {
+        toast.success(`Workflow "${data.name}" updated successfully`);
+        queryClient.invalidateQueries(trpc.workflows.getMany.queryOptions({}));
+        queryClient.invalidateQueries(trpc.workflows.getOne.queryOptions({ id: data.id }));
+      },
+      onError: error => {
+        toast.error(`Failed to update workflow: ${error.message}`);
+      },
     }),
   );
 };
