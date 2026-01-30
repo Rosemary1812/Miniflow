@@ -1,66 +1,41 @@
-import prisma from '@/lib/db';
+import { NonRetriableError } from 'inngest';
 import { inngest } from './client';
-import { generateText } from 'ai';
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
-import { createOpenAI } from '@ai-sdk/openai';
-import { createAnthropic } from '@ai-sdk/anthropic';
-import { deepseek } from '@ai-sdk/deepseek';
-
-const google = createGoogleGenerativeAI();
-// const openai = createOpenAI();
-// const anthropic = createAnthropic();
-export const execute = inngest.createFunction(
-  { id: 'execute' },
-  { event: 'execute/ai' },
+import prisma from '@/lib/db';
+import { topologicalSort } from './utils';
+import { getExecutor } from '@/features/exexutions/lib/executor-registry';
+import { NodeType } from '@prisma/client';
+export const executeWorkflow = inngest.createFunction(
+  { id: 'execute-workflow' },
+  { event: 'workflows/execute.workflow' },
   async ({ event, step }) => {
-    await step.sleep('pretend', '5s');
-    console.warn('Something is missing');
-    console.error('This is error');
-    const { steps: deepseekSteps } = await step.ai.wrap('deepseek-generate-text', generateText, {
-      model: deepseek('deepseek-chat'),
-      system: 'you are a helpful assisstant',
-      prompt: 'what is 22*22?',
-      experimental_telemetry: {
-        isEnabled: true,
-        recordInputs: true,
-        recordOutputs: true,
-      },
+    const workflowId = event.data.workflowId;
+    if (!workflowId) {
+      throw new NonRetriableError('Workflow ID is missing');
+    }
+    const sortedNodes = await step.run('prepare workflow', async () => {
+      const workflow = await prisma.workflow.findUnique({
+        where: { id: workflowId },
+        include: { nodes: true, connections: true },
+      });
+      return topologicalSort(workflow.nodes, workflow.connections);
     });
-    // const { steps: geminiSteps } = await step.ai.wrap('gemini-generate-text', generateText, {
-    //   model: google('models/gemini-1.5-flash'),
-    //   system: 'you are a helpful assisstant',
-    //   prompt: 'what is 22*22?',
-    //   experimental_telemetry: {
-    //     isEnabled: true,
-    //     recordInputs: true,
-    //     recordOutputs: true,
-    //   },
-    // });
-    // const { steps: openaiSteps } = await step.ai.wrap('openai-generate-text', generateText, {
-    //   model: openai('gpt-4o-mini'),
-    //   system: 'you are a helpful assisstant',
-    //   prompt: 'what is 22*22?',
-    //     experimental_telemetry: {
-    //   isEnabled: true,
-    //   recordInputs: true,
-    //   recordOutputs: true,
-    // },
-    // });
-    // const { steps: anthropicSteps } = await step.ai.wrap('anthropic-generate-text', generateText, {
-    //   model: anthropic('claude-3-opus-20240229'),
-    //   system: 'you are a helpful assisstant',
-    //   prompt: 'what is 22*22?',
-    //     experimental_telemetry: {
-    //   isEnabled: true,
-    //   recordInputs: true,
-    //   recordOutputs: true,
-    // },
-    // });
+
+    // Initialize the context with any initial data from triggers
+
+    let context = event.data.initialData || {};
+
+    for (const node of sortedNodes) {
+      const executor = getExecutor(node.type as NodeType);
+      context = await executor({
+        data: node.data as Record<string, unknown>,
+        nodeId: node.id,
+        context,
+        step,
+      });
+    }
     return {
-      deepseekSteps,
-      // geminiSteps,
-      // openaiSteps,
-      // anthropicSteps,
+      workflowId,
+      result: context,
     };
   },
 );
