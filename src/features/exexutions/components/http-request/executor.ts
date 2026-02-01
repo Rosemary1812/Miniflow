@@ -1,60 +1,109 @@
+import Handlebars from 'handlebars';
 import type { NodeExecutor } from '@/features/exexutions/types';
 import { NonRetriableError } from 'inngest';
 import ky, { type Options as KyOptions } from 'ky';
+import { httpRequestChannel } from '@/inngest/channels/http-request';
+
+Handlebars.registerHelper('json', context => {
+  const jsonString = JSON.stringify(context, null, 2);
+  const safeString = new Handlebars.SafeString(jsonString);
+  return safeString;
+});
 type HttpRequestData = {
-  variableName?: string;
-  endpoint?: string;
-  method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
+  variableName: string;
+  endpoint: string;
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
   body?: string;
 };
-export const httpReuestExecutor: NodeExecutor<HttpRequestData> = async ({
+export const httpRequestExecutor: NodeExecutor<HttpRequestData> = async ({
   data,
   nodeId,
   context,
   step,
+  publish,
 }) => {
+  await publish(
+    httpRequestChannel().status({
+      nodeId,
+      status: 'loading',
+    }),
+  );
   if (!data.endpoint) {
+    await publish(
+      httpRequestChannel().status({
+        nodeId,
+        status: 'error',
+      }),
+    );
     throw new NonRetriableError('Http Request node:No endpoint configured');
   }
   if (!data.variableName) {
+    await publish(
+      httpRequestChannel().status({
+        nodeId,
+        status: 'error',
+      }),
+    );
     throw new NonRetriableError('Variable name not configured');
   }
-  const result = await step.run('http-request', async () => {
-    const endpoint = data.endpoint!;
-    const method = data.method || 'GET';
-    const options: KyOptions = {
-      method,
-    };
-    if (['POST', 'PUT', 'PATCH'].includes(method)) {
-      options.body = data.body;
-      options.headers = {
-        'Content-Type': 'application/json',
+  if (!data.method) {
+    await publish(
+      httpRequestChannel().status({
+        nodeId,
+        status: 'error',
+      }),
+    );
+    throw new NonRetriableError('method not configured');
+  }
+  try {
+    const result = await step.run('http-request', async () => {
+      const endpoint = Handlebars.compile(data.endpoint)(context);
+      console.log('ENDPOINT', { endpoint });
+      const method = data.method;
+      const options: KyOptions = {
+        method,
       };
-    }
-    const response = await ky(endpoint, options);
-    const contentType = response.headers.get('content-type');
-    const responseData = contentType?.includes('application/json')
-      ? await response.json()
-      : await response.text();
+      if (['POST', 'PUT', 'PATCH'].includes(method)) {
+        const resolved = Handlebars.compile(data.body)(context);
+        JSON.parse(resolved);
+        options.body = resolved;
+        options.headers = {
+          'Content-Type': 'application/json',
+        };
+      }
+      const response = await ky(endpoint, options);
+      const contentType = response.headers.get('content-type');
+      const responseData = contentType?.includes('application/json')
+        ? await response.json()
+        : await response.text();
 
-    const responsePayload = {
-      httpResponse: {
-        status: response.status,
-        statusText: response.statusText,
-        data: responseData,
-      },
-    };
-    if (data.variableName) {
+      const responsePayload = {
+        httpResponse: {
+          status: response.status,
+          statusText: response.statusText,
+          data: responseData,
+        },
+      };
       return {
         ...context,
         [data.variableName]: responsePayload,
       };
-    }
-    return {
-      ...context,
-      responsePayload,
-    };
-  });
-  // const result = await step.run('http-request', async () => context);
-  return result;
+    });
+    await publish(
+      httpRequestChannel().status({
+        nodeId,
+        status: 'success',
+      }),
+    );
+    // const result = await step.run('http-request', async () => context);
+    return result;
+  } catch (error) {
+    await publish(
+      httpRequestChannel().status({
+        nodeId,
+        status: 'error',
+      }),
+    );
+    throw error;
+  }
 };

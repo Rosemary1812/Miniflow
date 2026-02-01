@@ -4,10 +4,11 @@ import prisma from '@/lib/db';
 import { topologicalSort } from './utils';
 import { getExecutor } from '@/features/exexutions/lib/executor-registry';
 import { NodeType } from '@prisma/client';
+import { httpRequestChannel } from './channels/http-request';
 export const executeWorkflow = inngest.createFunction(
-  { id: 'execute-workflow' },
-  { event: 'workflows/execute.workflow' },
-  async ({ event, step }) => {
+  { id: 'execute-workflow', retries: 0 },
+  { event: 'workflows/execute.workflow', channels: [httpRequestChannel()] },
+  async ({ event, step, publish }) => {
     const workflowId = event.data.workflowId;
     if (!workflowId) {
       throw new NonRetriableError('Workflow ID is missing');
@@ -31,6 +32,7 @@ export const executeWorkflow = inngest.createFunction(
         nodeId: node.id,
         context,
         step,
+        publish,
       });
     }
     return {
