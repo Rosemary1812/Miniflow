@@ -1,13 +1,14 @@
 'use server';
 
 import { getSubscriptionToken, type Realtime } from '@inngest/realtime';
-import { httpRequestChannel } from '@/inngest/channels/http-request';
 import { inngest } from '@/inngest/client';
+import { manualTriggerChannel } from '@/inngest/channels/manual-trigger';
 
-export type HttpRequestToken = Realtime.Token<typeof httpRequestChannel, ['status']>;
-export async function fetchHttpRequestRealtimeToken(): Promise<HttpRequestToken> {
+export type ManualTriggerToken = Realtime.Token<typeof manualTriggerChannel, ['status']>;
+
+export async function fetchManualTriggerRealtimeToken(): Promise<ManualTriggerToken> {
   const token = await getSubscriptionToken(inngest, {
-    channel: httpRequestChannel(),
+    channel: manualTriggerChannel(),
     topics: ['status'],
   });
   return token;
