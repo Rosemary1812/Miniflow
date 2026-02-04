@@ -6,6 +6,7 @@ import z, { positive } from 'zod';
 import type { Node, Edge } from '@xyflow/react';
 import { NodeType } from '@prisma/client';
 import { inngest } from '@/inngest/client';
+import { sendWorkflowExecution } from '@/inngest/utils';
 
 export const workflowRouter = createTRPCRouter({
   execute: protectedProcedure
@@ -17,12 +18,11 @@ export const workflowRouter = createTRPCRouter({
           userId: ctx.auth.user.id,
         },
       });
-      await inngest.send({
-        name: 'workflows/execute.workflow',
-        data: { workflowId: input.id },
-      });
+
+      await sendWorkflowExecution({ workflowId: input.id });
       return workflow;
     }),
+
   create: premiumProcedure.mutation(({ ctx }) => {
     return prisma.workflow.create({
       data: {
