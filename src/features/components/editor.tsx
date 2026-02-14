@@ -23,7 +23,7 @@ import '@xyflow/react/dist/style.css';
 import { nodeComponents } from '@/config/node-components';
 
 import { AddNodeButton } from './add-node-button';
-import { editorAtom } from '../store/atoms';
+import { editorAtom } from '../editor/store/atoms';
 import { useSetAtom } from 'jotai';
 import { NodeType } from '@prisma/client';
 import { ExecuteWorkflowButton } from './execute-workflow-button';

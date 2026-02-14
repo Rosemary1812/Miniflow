@@ -24,6 +24,16 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { useEffect } from 'react';
+import { CredentialType } from '@prisma/client';
+import { useCredentialsByType } from '@/features/credentials/hooks/use-credentials';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import Image from 'next/image';
 
 const formSchema = z.object({
   variableName: z
@@ -33,7 +43,7 @@ const formSchema = z.object({
       message:
         'Variable name must start with a letter or underscore and contain only letters, numbers, and underscores',
     }),
-
+  credentialId: z.string().min(1, 'Credential is required'),
   systemPrompt: z.string().optional(),
   userPrompt: z.string().min(1, 'User prompt is required'),
 });
@@ -48,10 +58,14 @@ interface Props {
 }
 
 export const AnthropicDialog = ({ open, onOpenChange, onSubmit, defaultValues = {} }: Props) => {
+  const { data: credentials, isLoading: isLoadingCredentials } = useCredentialsByType(
+    CredentialType.ANTHROPIC,
+  );
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       variableName: defaultValues.variableName || '',
+      credentialId: defaultValues.credentialId || '',
       systemPrompt: defaultValues.systemPrompt || '',
       userPrompt: defaultValues.userPrompt || '',
     },
@@ -61,14 +75,14 @@ export const AnthropicDialog = ({ open, onOpenChange, onSubmit, defaultValues = 
     if (open) {
       form.reset({
         variableName: defaultValues.variableName || '',
-
+        credentialId: defaultValues.credentialId || '',
         systemPrompt: defaultValues.systemPrompt || '',
         userPrompt: defaultValues.userPrompt || '',
       });
     }
   }, [open, defaultValues, form]);
 
-  const watchVariableName = form.watch('variableName') || 'myOpenAI';
+  const watchVariableName = form.watch('variableName') || 'myAnthropic';
   const handleSubmit = (values: z.infer<typeof formSchema>) => {
     onSubmit(values);
     onOpenChange(false);
@@ -77,7 +91,7 @@ export const AnthropicDialog = ({ open, onOpenChange, onSubmit, defaultValues = 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>OpenAI Configuration</DialogTitle>
+          <DialogTitle>Anthropic Configuration</DialogTitle>
           <DialogDescription>Configure the AI model and prompts for this node</DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -99,7 +113,42 @@ export const AnthropicDialog = ({ open, onOpenChange, onSubmit, defaultValues = 
                 </FormItem>
               )}
             />
-
+            <FormField
+              control={form.control}
+              name="credentialId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Anthropic Credential</FormLabel>
+                  <Select
+                    onValueChange={field.onChange}
+                    defaultValue={field.value}
+                    disabled={isLoadingCredentials || !credentials?.length}
+                  >
+                    <FormControl>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select a credential" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {credentials?.map(option => (
+                        <SelectItem key={option.id} value={option.id}>
+                          <div className="flex items-center gap-2">
+                            <Image
+                              src="/logos/anthropic.svg"
+                              alt="Anthropic"
+                              width={16}
+                              height={16}
+                            />
+                            {option.name}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <FormField
               control={form.control}
               name="systemPrompt"

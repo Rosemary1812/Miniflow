@@ -4,8 +4,8 @@ import { prefetchWorkflow } from '@/features/workflows/server/prefetch';
 import { requireAuth } from '@/lib/auth-utils';
 import { ErrorBoundary } from 'react-error-boundary';
 import { Suspense } from 'react';
-import { EditorError, EditorLoading, Editor } from '@/features/editor/components/editor';
-import { EditorHeader } from '@/features/editor/components/editor-header';
+import { EditorError, EditorLoading, Editor } from '@/features/components/editor';
+import { EditorHeader } from '@/features/components/editor-header';
 
 interface PageProps {
   params: Promise<{

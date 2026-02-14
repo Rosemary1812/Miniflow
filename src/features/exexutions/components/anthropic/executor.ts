@@ -4,6 +4,7 @@ import { createAnthropic } from '@ai-sdk/anthropic';
 import { anthropicChannel } from '@/inngest/channels/anthropic';
 import { generateText } from 'ai';
 import { NonRetriableError } from 'inngest';
+import prisma from '@/lib/db';
 
 Handlebars.registerHelper('json', context => {
   const jsonString = JSON.stringify(context, null, 2);
@@ -12,6 +13,7 @@ Handlebars.registerHelper('json', context => {
 });
 type AnthropicNodeData = {
   variableName?: string;
+  credentialId?: string;
   systemPrompt?: string;
   userPrompt?: string;
 };
@@ -37,19 +39,39 @@ export const anthropicExecutor: NodeExecutor<AnthropicNodeData> = async ({
     );
     throw new NonRetriableError('Anthropic variableName is missing');
   }
+  if (!data.credentialId) {
+    await publish(
+      anthropicChannel().status({
+        nodeId,
+        status: 'error',
+      }),
+    );
+    throw new NonRetriableError('Anthropic node:CredentialId is required ');
+  }
   const systemPrompt = data.systemPrompt
     ? Handlebars.compile(data.systemPrompt)(context)
     : 'You are a helpful assistant.';
 
   const userPrompt = Handlebars.compile(data.userPrompt)(context);
 
-  const credentialValue = process.env.ANTHROPIC_API_KEY;
+  const credential = await step.run('get-credential', () => {
+    return prisma.credential.findUnique({
+      where: {
+        id: data.credentialId,
+      },
+    });
+  });
+
+  if (!credential) {
+    throw new NonRetriableError('Anthropic node:CredentialId is not found');
+  }
+
   const anthropic = createAnthropic({
-    apiKey: credentialValue,
+    apiKey: credential.value,
   });
   try {
     const { steps } = await step.ai.wrap('anthropic-generate-text', generateText, {
-      model: anthropic('claude-sonnet-4.5'),
+      model: anthropic('claude-3-5-sonnet-latest'),
       system: systemPrompt,
       prompt: userPrompt,
       experimental_telemetry: {

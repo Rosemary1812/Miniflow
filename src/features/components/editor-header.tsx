@@ -17,7 +17,7 @@ import {
   useUpdateWorkflowName,
   useUpdateWorkflow,
 } from '@/features/workflows/hooks/use-workflows';
-import { editorAtom } from '../store/atoms';
+import { editorAtom } from '../editor/store/atoms';
 import { useAtomValue } from 'jotai';
 
 export const EditorSaveButton = ({ workflowId }: { workflowId: string }) => {
