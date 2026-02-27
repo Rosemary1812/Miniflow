@@ -1,5 +1,5 @@
 import Handlebars from 'handlebars';
-import type { NodeExecutor } from '@/features/exexutions/types';
+import type { NodeExecutor } from '@/features/executions/types';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { anthropicChannel } from '@/inngest/channels/anthropic';
 import { generateText } from 'ai';
@@ -20,6 +20,7 @@ type AnthropicNodeData = {
 export const anthropicExecutor: NodeExecutor<AnthropicNodeData> = async ({
   data,
   nodeId,
+  userId,
   context,
   step,
   publish,
@@ -58,6 +59,7 @@ export const anthropicExecutor: NodeExecutor<AnthropicNodeData> = async ({
     return prisma.credential.findUnique({
       where: {
         id: data.credentialId,
+        userId,
       },
     });
   });

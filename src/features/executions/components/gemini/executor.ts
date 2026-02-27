@@ -1,7 +1,7 @@
 import Handlebars from 'handlebars';
-import type { NodeExecutor } from '@/features/exexutions/types';
-import { createOpenAI } from '@ai-sdk/openai';
-import { openAiChannel } from '@/inngest/channels/openai';
+import type { NodeExecutor } from '@/features/executions/types';
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
+import { geminiChannel } from '@/inngest/channels/gemini';
 import { generateText } from 'ai';
 import { NonRetriableError } from 'inngest';
 import prisma from '@/lib/db';
@@ -11,42 +11,43 @@ Handlebars.registerHelper('json', context => {
   const safeString = new Handlebars.SafeString(jsonString);
   return safeString;
 });
-type OpenAINodeData = {
+type GeminiNodeData = {
   variableName?: string;
   credentialId?: string;
   systemPrompt?: string;
   userPrompt?: string;
 };
-export const openAiExecutor: NodeExecutor<OpenAINodeData> = async ({
+export const geminiExecutor: NodeExecutor<GeminiNodeData> = async ({
   data,
   nodeId,
+  userId,
   context,
   step,
   publish,
 }) => {
   await publish(
-    openAiChannel().status({
+    geminiChannel().status({
       nodeId,
       status: 'loading',
     }),
   );
   if (!data.variableName) {
     await publish(
-      openAiChannel().status({
+      geminiChannel().status({
         nodeId,
         status: 'error',
       }),
     );
-    throw new NonRetriableError('OpenAI variableName is missing');
+    throw new NonRetriableError('Gemini variableName is missing');
   }
   if (!data.credentialId) {
     await publish(
-      openAiChannel().status({
+      geminiChannel().status({
         nodeId,
         status: 'error',
       }),
     );
-    throw new NonRetriableError('OpenAI node:CredentialId is required ');
+    throw new NonRetriableError('Gemini node:CredentialId is required ');
   }
   const systemPrompt = data.systemPrompt
     ? Handlebars.compile(data.systemPrompt)(context)
@@ -58,31 +59,31 @@ export const openAiExecutor: NodeExecutor<OpenAINodeData> = async ({
     return prisma.credential.findUnique({
       where: {
         id: data.credentialId,
+        userId,
       },
     });
   });
 
   if (!credential) {
-    throw new NonRetriableError('OpenAI node:CredentialId is not found');
+    throw new NonRetriableError('Gemini node:CredentialId is not found');
   }
-
-  const openai = createOpenAI({
+  const google = createGoogleGenerativeAI({
     apiKey: credential.value,
   });
   try {
-    const { steps } = await step.ai.wrap('openai-generate-text', generateText, {
-      model: openai('gpt-4o'),
+    const { steps } = await step.ai.wrap('gemini-generate-text', generateText, {
+      model: google('gemini-2.0-flash'),
       system: systemPrompt,
       prompt: userPrompt,
       experimental_telemetry: {
-        isEnabled: true,
+        inEnabled: true,
         recordInputs: true,
         recordOutputs: true,
       },
     });
     const text = steps[0].content[0].type === 'text' ? steps[0].content[0].text : '';
     await publish(
-      openAiChannel().status({
+      geminiChannel().status({
         nodeId,
         status: 'success',
       }),
@@ -95,7 +96,7 @@ export const openAiExecutor: NodeExecutor<OpenAINodeData> = async ({
     };
   } catch (error) {
     await publish(
-      openAiChannel().status({
+      geminiChannel().status({
         nodeId,
         status: 'error',
       }),

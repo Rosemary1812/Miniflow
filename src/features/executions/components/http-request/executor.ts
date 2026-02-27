@@ -1,5 +1,5 @@
 import Handlebars from 'handlebars';
-import type { NodeExecutor } from '@/features/exexutions/types';
+import type { NodeExecutor } from '@/features/executions/types';
 import { NonRetriableError } from 'inngest';
 import ky, { type Options as KyOptions } from 'ky';
 import { httpRequestChannel } from '@/inngest/channels/http-request';

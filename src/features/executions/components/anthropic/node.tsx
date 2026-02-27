@@ -4,7 +4,7 @@ import { Node, NodeProps, useReactFlow } from '@xyflow/react';
 import { memo, useState } from 'react';
 import { BaseExecutionNode } from '../base-execution-node';
 import { AnthropicFormValues, AnthropicDialog } from './dialog';
-import { useNodeStatus } from '@/features/exexutions/hooks/use-node-status';
+import { useNodeStatus } from '@/features/executions/hooks/use-node-status';
 import { fetchAnthropicRealtimeToken } from './actions';
 import { ANTHROPIC_CHANNEL_NAME } from '@/inngest/channels/anthropic';
 

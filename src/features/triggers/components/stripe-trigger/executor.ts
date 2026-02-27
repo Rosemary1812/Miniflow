@@ -1,4 +1,4 @@
-import type { NodeExecutor } from '@/features/exexutions/types';
+import type { NodeExecutor } from '@/features/executions/types';
 import { stripeTriggerChannel } from '@/inngest/channels/stripe-trigger';
 type StripeTriggerData = Record<string, unknown>;
 export const stripeTriggerExecutor: NodeExecutor<StripeTriggerData> = async ({

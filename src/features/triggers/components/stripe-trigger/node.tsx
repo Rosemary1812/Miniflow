@@ -2,7 +2,7 @@ import { NodeProps } from '@xyflow/react';
 import { memo, useState } from 'react';
 import { BaseTriggerNode } from '../base-trigger-node';
 import { StripeTriggerDialog } from './dialog';
-import { useNodeStatus } from '@/features/exexutions/hooks/use-node-status';
+import { useNodeStatus } from '@/features/executions/hooks/use-node-status';
 import { STRIPE_TRIGGER_CHANNEL_NAME } from '@/inngest/channels/stripe-trigger';
 import { fetchStripeTriggerRealtimeToken } from './actions';
 
