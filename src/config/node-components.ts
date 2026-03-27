@@ -10,6 +10,8 @@ import { OpenAINode } from '@/features/executions/components/openai/node';
 import { AnthropicNode } from '@/features/executions/components/anthropic/node';
 import { DiscordNode } from '@/features/executions/components/discord/node';
 import { SlackNode } from '@/features/executions/components/slack/node';
+import { IfBranchNode } from '@/features/executions/components/if-branch/node';
+import { ScheduleTriggerNode } from '@/features/triggers/components/schedule-trigger/node';
 
 export const nodeComponents = {
   [NodeType.INITIAL]: InitialNode,
@@ -22,6 +24,8 @@ export const nodeComponents = {
   [NodeType.ANTHROPIC]: AnthropicNode,
   [NodeType.DISCORD]: DiscordNode,
   [NodeType.SLACK]: SlackNode,
+  [NodeType.IF_BRANCH]: IfBranchNode,
+  [NodeType.SCHEDULE_TRIGGER]: ScheduleTriggerNode,
 } as const satisfies NodeTypes;
 
 export type RegisteredNodeType = keyof typeof nodeComponents;

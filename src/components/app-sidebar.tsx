@@ -1,7 +1,9 @@
 'use client';
 
 import {
+  BarChart3Icon,
   CreditCardIcon,
+  FileTextIcon,
   FolderOpenIcon,
   HistoryIcon,
   KeyIcon,
@@ -44,6 +46,16 @@ const menuItems = [
         icon: HistoryIcon,
         href: '/executions',
       },
+      {
+        title: 'Analytics',
+        icon: BarChart3Icon,
+        href: '/analytics',
+      },
+      {
+        title: 'Templates',
+        icon: FileTextIcon,
+        href: '/templates',
+      },
     ],
   },
 ];
@@ -57,8 +69,8 @@ export const AppSidebar = () => {
         <SidebarMenuItem>
           <SidebarMenuButton asChild className="gap-x-4 h-10 px-4">
             <Link href="/workflows" prefetch>
-              <Image src="/logos/logo.svg" alt="n9n" width={30} height={30} />
-              <span className="font-semibold text-sm">N9N</span>
+              <Image src="/logos/logo.svg" alt="miniflow" width={30} height={30} />
+              <span className="font-semibold text-sm">Miniflow</span>
             </Link>
           </SidebarMenuButton>
         </SidebarMenuItem>

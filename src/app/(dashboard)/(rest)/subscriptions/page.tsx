@@ -1,21 +1,24 @@
-'use client';
+import { requireAuth } from '@/lib/auth-utils';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
-import { useTRPC } from '@/app/trpc/client';
-import { useMutation } from '@tanstack/react-query';
-import { toast } from 'sonner';
-import { Button } from '@/components/ui/button';
-const Page = () => {
-  const trpc = useTRPC();
-  const testAI = useMutation(
-    trpc.testAi.mutationOptions({
-      onSuccess: () => {
-        toast.success('Test AI success');
-      },
-      onError: ({ message }) => {
-        toast.error(message);
-      },
-    }),
+const Page = async () => {
+  await requireAuth();
+
+  return (
+    <div className="p-6 max-w-2xl">
+      <h1 className="text-2xl font-bold mb-4">Subscription</h1>
+      <Card>
+        <CardHeader>
+          <CardTitle>Pro Plan</CardTitle>
+          <CardDescription>Upgrade to unlock unlimited workflows and advanced features.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            Subscription management coming soon.
+          </p>
+        </CardContent>
+      </Card>
+    </div>
   );
-  return <Button onClick={() => testAI.mutate()}>subs</Button>;
 };
 export default Page;

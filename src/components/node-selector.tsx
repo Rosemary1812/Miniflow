@@ -2,7 +2,7 @@
 
 import { createId } from '@paralleldrive/cuid2';
 import { useReactFlow } from '@xyflow/react';
-import { GlobeIcon, MousePointerIcon, WebhookIcon } from 'lucide-react';
+import { GlobeIcon, MousePointerIcon, WebhookIcon, GitBranchIcon, ClockIcon } from 'lucide-react';
 
 import { useCallback } from 'react';
 import { toast } from 'sonner';
@@ -20,7 +20,7 @@ export type NodeTypeOption = {
   type: NodeType;
   label: string;
   description: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: React.ComponentType<{ className?: string }> | string;
 };
 
 const triggerNodes: NodeTypeOption[] = [
@@ -29,6 +29,12 @@ const triggerNodes: NodeTypeOption[] = [
     label: 'Manual Trigger',
     description: 'Runs the flow on clicking a button.Good for getting started quickly.',
     icon: MousePointerIcon,
+  },
+  {
+    type: NodeType.SCHEDULE_TRIGGER,
+    label: 'Schedule Trigger',
+    description: 'Runs the flow on a recurring schedule based on a cron expression.',
+    icon: ClockIcon,
   },
   {
     type: NodeType.GOOGLE_FORM_TRIGGER,
@@ -45,6 +51,12 @@ const triggerNodes: NodeTypeOption[] = [
 ];
 
 const excutionNodes: NodeTypeOption[] = [
+  {
+    type: NodeType.IF_BRANCH,
+    label: 'If / Branch',
+    description: 'Branch based on a condition.',
+    icon: GitBranchIcon,
+  },
   {
     type: NodeType.HTTP_REQUEST,
     label: 'HTTP Request',

@@ -5,6 +5,7 @@ import { openAiChannel } from '@/inngest/channels/openai';
 import { generateText } from 'ai';
 import { NonRetriableError } from 'inngest';
 import prisma from '@/lib/db';
+import { decrypt } from '@/lib/crypto';
 
 Handlebars.registerHelper('json', context => {
   const jsonString = JSON.stringify(context, null, 2);
@@ -16,6 +17,8 @@ type OpenAINodeData = {
   credentialId?: string;
   systemPrompt?: string;
   userPrompt?: string;
+  baseURL?: string; // optional, supports Groq/OpenRouter/any OpenAI-compatible API
+  model?: string; // optional, defaults to 'gpt-4o'
 };
 export const openAiExecutor: NodeExecutor<OpenAINodeData> = async ({
   data,
@@ -68,17 +71,21 @@ export const openAiExecutor: NodeExecutor<OpenAINodeData> = async ({
     throw new NonRetriableError('OpenAI node:CredentialId is not found');
   }
 
+  // Decrypt the stored API key
+  const apiKey = decrypt(credential.encryptedValue, credential.iv);
+
   const openai = createOpenAI({
-    apiKey: credential.value,
+    apiKey,
+    ...(data.baseURL && { baseURL: data.baseURL }),
   });
   try {
     const { steps } = await step.ai.wrap('openai-generate-text', generateText, {
-      model: openai('gpt-4o'),
+      model: openai(data.model || 'gpt-4o'),
       system: systemPrompt,
       prompt: userPrompt,
       experimental_telemetry: {
         isEnabled: true,
-        recordInputs: true,
+        recordInputs: false, // Disabled to prevent API key from appearing in logs
         recordOutputs: true,
       },
     });

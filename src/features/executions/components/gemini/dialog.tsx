@@ -43,9 +43,11 @@ const formSchema = z.object({
       message:
         'Variable name must start with a letter or underscore and contain only letters, numbers, and underscores',
     }),
-
+  credentialId: z.string().optional(),
   systemPrompt: z.string().optional(),
   userPrompt: z.string().min(1, 'User prompt is required'),
+  baseURL: z.string().optional(),
+  model: z.string().optional(),
 });
 
 export type GeminiFormValues = z.infer<typeof formSchema>;
@@ -68,6 +70,8 @@ export const GeminiDialog = ({ open, onOpenChange, onSubmit, defaultValues = {} 
       credentialId: defaultValues.credentialId || '',
       systemPrompt: defaultValues.systemPrompt || '',
       userPrompt: defaultValues.userPrompt || '',
+      baseURL: defaultValues.baseURL || '',
+      model: defaultValues.model || '',
     },
   });
 
@@ -78,6 +82,8 @@ export const GeminiDialog = ({ open, onOpenChange, onSubmit, defaultValues = {} 
         credentialId: defaultValues.credentialId || '',
         systemPrompt: defaultValues.systemPrompt || '',
         userPrompt: defaultValues.userPrompt || '',
+        baseURL: defaultValues.baseURL || '',
+        model: defaultValues.model || '',
       });
     }
   }, [open, defaultValues, form]);
@@ -188,6 +194,36 @@ export const GeminiDialog = ({ open, onOpenChange, onSubmit, defaultValues = {} 
                 </FormItem>
               )}
             />
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="model"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Model</FormLabel>
+                    <FormControl>
+                      <Input placeholder="gemini-2.0-flash" {...field} />
+                    </FormControl>
+                    <FormDescription>Leave empty for default</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="baseURL"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Base URL</FormLabel>
+                    <FormControl>
+                      <Input placeholder="https://api.groq.com/openai/v1" {...field} />
+                    </FormControl>
+                    <FormDescription>For compatible providers</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
             <DialogFooter className="mt-4">
               <Button type="submit">Save</Button>
             </DialogFooter>

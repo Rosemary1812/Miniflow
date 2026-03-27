@@ -1,7 +1,7 @@
 import { requireAuth } from '@/lib/auth-utils';
 import { SearchParams } from 'nuqs';
 import { HydrateClient } from '../../../trpc/server';
-import { ErrorBoundary } from 'next/dist/client/components/error-boundary';
+import { ErrorBoundary } from '@sentry/nextjs';
 import { Suspense } from 'react';
 import {
   ExecutionsContainer,

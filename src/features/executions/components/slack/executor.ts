@@ -71,9 +71,9 @@ export const slackExecutor: NodeExecutor<SlackData> = async ({
         throw new NonRetriableError('Slack webhookUrl is missing');
       }
       return {
-        ...content,
+        ...context,
         [data.variableName]: {
-          messageContent: content.slice(0, 2000),
+          messageContent: (content || '').slice(0, 2000),
         },
       };
     });

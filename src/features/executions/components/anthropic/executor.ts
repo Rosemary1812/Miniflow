@@ -5,6 +5,7 @@ import { anthropicChannel } from '@/inngest/channels/anthropic';
 import { generateText } from 'ai';
 import { NonRetriableError } from 'inngest';
 import prisma from '@/lib/db';
+import { decrypt } from '@/lib/crypto';
 
 Handlebars.registerHelper('json', context => {
   const jsonString = JSON.stringify(context, null, 2);
@@ -16,6 +17,8 @@ type AnthropicNodeData = {
   credentialId?: string;
   systemPrompt?: string;
   userPrompt?: string;
+  baseURL?: string; // optional, supports Groq/OpenRouter/any Anthropic-compatible API
+  model?: string; // optional, defaults to 'claude-3-5-sonnet-latest'
 };
 export const anthropicExecutor: NodeExecutor<AnthropicNodeData> = async ({
   data,
@@ -68,17 +71,21 @@ export const anthropicExecutor: NodeExecutor<AnthropicNodeData> = async ({
     throw new NonRetriableError('Anthropic node:CredentialId is not found');
   }
 
+  // Decrypt the stored API key
+  const apiKey = decrypt(credential.encryptedValue, credential.iv);
+
   const anthropic = createAnthropic({
-    apiKey: credential.value,
+    apiKey,
+    ...(data.baseURL && { baseURL: data.baseURL }),
   });
   try {
     const { steps } = await step.ai.wrap('anthropic-generate-text', generateText, {
-      model: anthropic('claude-3-5-sonnet-latest'),
+      model: anthropic(data.model || 'claude-3-5-sonnet-latest'),
       system: systemPrompt,
       prompt: userPrompt,
       experimental_telemetry: {
         isEnabled: true,
-        recordInputs: true,
+        recordInputs: false, // Disabled to prevent API key from appearing in logs
         recordOutputs: true,
       },
     });

@@ -12,21 +12,12 @@ import {
   LoadingView,
 } from '@/components/entity-components';
 import {
-  useCreateCredential,
-  useRemoveExecution,
   useSuspenseExecutions,
 } from '@/features/executions/hooks/use-executions';
-import { useRouter } from 'next/navigation';
 import { useExecutionsParams } from '../hooks/use-executions-params';
-import { useEntitySearch } from '@/hooks/use-entity-search';
 import { ExecutionStatus } from '@prisma/client';
 import { Execution } from '@prisma/client';
-import { Record } from '@prisma/client/runtime/library';
-import Image from 'next/image';
 import { CheckCircle2Icon, ClockIcon, Loader2Icon, XCircleIcon } from 'lucide-react';
-
-// import type { Execution } from '@/generated/prisma/browser';
-// import { ExecutionIcon } from 'lucide-react';
 
 export const ExecutionsList = () => {
   const executions = useSuspenseExecutions();
@@ -42,7 +33,7 @@ export const ExecutionsList = () => {
 };
 
 export const ExecutionsHeader = ({ disabled }: { disabled?: boolean }) => {
-  return <EntityHeader title="Executions" description="Create and manage your executions" />;
+  return <EntityHeader title="Executions" description="View your workflow execution history" newBottonLabel="" disabled={disabled} />;
 };
 
 export const ExecutionsPagination = () => {
@@ -101,7 +92,7 @@ export const ExecutionItem = ({
     workflow: {
       id: string;
       name: string;
-    };
+    } | null;
   };
 }) => {
   const duration = data.completedAt
@@ -110,7 +101,7 @@ export const ExecutionItem = ({
 
   const subtitle = (
     <>
-      {data.workflow.name}&bull; Started {formatDistanceToNow(data.startedAt, { addSuffix: true })}
+      {data.workflow?.name ?? 'Unknown workflow'}&bull; Started {formatDistanceToNow(data.startedAt, { addSuffix: true })}
       {duration !== null && <>&bull; Took {duration}s</>}
     </>
   );
@@ -123,6 +114,6 @@ export const ExecutionItem = ({
       image={
         <div className="size-8 flex items-center justify-center">{getStatusIcon(data.status)}</div>
       }
-    ></EntityItem>
+    />
   );
 };

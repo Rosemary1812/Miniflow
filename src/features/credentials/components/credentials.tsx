@@ -21,9 +21,17 @@ import { useRouter } from 'next/navigation';
 import { useCredentialsParams } from '../hooks/use-credentials-params';
 import  { useEntitySearch } from '@/hooks/use-entity-search';
 import { CredentialType } from '@prisma/client';
-import { Credential } from '@prisma/client';
-import { Record } from '@prisma/client/runtime/library';
 import Image from 'next/image';
+
+// Type for list items (no sensitive fields)
+type CredentialListItem = {
+  id: string;
+  name: string;
+  type: CredentialType;
+  createdAt: Date;
+  updatedAt: Date;
+  userId: string;
+};
 
 // import type { Credential } from '@/generated/prisma/browser';
 // import { CredentialIcon } from 'lucide-react';
@@ -113,7 +121,7 @@ const credentialLogos: Record<CredentialType, string> = {
   [CredentialType.GEMINI]: '/logos/gemini.svg',
 };
 
-export const CredentialItem = ({ data }: { data: Credential }) => {
+export const CredentialItem = ({ data }: { data: CredentialListItem }) => {
   const removeCredential = useRemoveCredential();
   const handleRemove = () => {
     removeCredential.mutate({ id: data.id });

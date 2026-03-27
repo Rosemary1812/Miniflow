@@ -46,6 +46,8 @@ const formSchema = z.object({
   credentialId: z.string().min(1, 'Credential is required'),
   systemPrompt: z.string().optional(),
   userPrompt: z.string().min(1, 'User prompt is required'),
+  baseURL: z.string().optional(),
+  model: z.string().optional(),
 });
 
 export type AnthropicFormValues = z.infer<typeof formSchema>;
@@ -68,6 +70,8 @@ export const AnthropicDialog = ({ open, onOpenChange, onSubmit, defaultValues = 
       credentialId: defaultValues.credentialId || '',
       systemPrompt: defaultValues.systemPrompt || '',
       userPrompt: defaultValues.userPrompt || '',
+      baseURL: defaultValues.baseURL || '',
+      model: defaultValues.model || '',
     },
   });
 
@@ -78,6 +82,8 @@ export const AnthropicDialog = ({ open, onOpenChange, onSubmit, defaultValues = 
         credentialId: defaultValues.credentialId || '',
         systemPrompt: defaultValues.systemPrompt || '',
         userPrompt: defaultValues.userPrompt || '',
+        baseURL: defaultValues.baseURL || '',
+        model: defaultValues.model || '',
       });
     }
   }, [open, defaultValues, form]);
@@ -191,6 +197,36 @@ export const AnthropicDialog = ({ open, onOpenChange, onSubmit, defaultValues = 
                 </FormItem>
               )}
             />
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="model"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Model</FormLabel>
+                    <FormControl>
+                      <Input placeholder="claude-3-5-sonnet-latest" {...field} />
+                    </FormControl>
+                    <FormDescription>Leave empty for default</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="baseURL"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Base URL</FormLabel>
+                    <FormControl>
+                      <Input placeholder="https://api.groq.com/openai/v1" {...field} />
+                    </FormControl>
+                    <FormDescription>For Groq, OpenRouter etc.</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
             <DialogFooter className="mt-4">
               <Button type="submit">Save</Button>
             </DialogFooter>

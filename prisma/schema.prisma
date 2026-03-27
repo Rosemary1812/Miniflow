@@ -82,10 +82,12 @@ model Verification {
 }
 
 model Credential {
-  id    String         @id @default(cuid())
-  name  String
-  value String
-  type  CredentialType
+  id             String         @id @default(cuid())
+  name           String
+  encryptedValue String         // AES-256-GCM encrypted API key
+  iv             String         // Initialization vector (16 bytes hex)
+  keyVersion     Int            @default(1) // Encryption key version for rotation
+  type           CredentialType
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -94,6 +96,9 @@ model Credential {
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   Node Node[]
+
+  // Hide plaintext value from Prisma queries by default
+  @@map("credential")
 }
 
 enum CredentialType {
@@ -111,6 +116,7 @@ model Workflow {
   nodes       Node[]
   connections Connection[]
   executions  Execution[]
+  scheduledWorkflow ScheduledWorkflow?
 
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -127,6 +133,20 @@ enum NodeType {
   OPENAI
   DISCORD
   SLACK
+  IF_BRANCH
+  SCHEDULE_TRIGGER
+}
+
+model ScheduledWorkflow {
+  id          String   @id @default(cuid())
+  workflowId  String   @unique
+  workflow    Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  cron        String   // cron expression, e.g. "*/5 * * * *"
+  timezone    String   @default("UTC")
+  active      Boolean  @default(true)
+  nextRunAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model Node {
@@ -188,4 +208,16 @@ model Execution {
   inngestEventId String @unique
 
   output Json?
+}
+
+model WorkflowTemplate {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  category    String   @default("general")
+  nodes       Json
+  edges       Json
+  isBuiltIn   Boolean @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

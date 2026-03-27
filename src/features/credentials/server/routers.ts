@@ -1,8 +1,33 @@
 import { createTRPCRouter, premiumProcedure, protectedProcedure } from '@/app/trpc/init';
 import { PAGINATION } from '@/config/constants';
 import prisma from '@/lib/db';
+import { encrypt, decrypt } from '@/lib/crypto';
 import { CredentialType } from '@prisma/client';
 import z from 'zod';
+
+// Exclude sensitive fields from list responses
+type CredentialListItem = {
+  id: string;
+  name: string;
+  type: CredentialType;
+  createdAt: Date;
+  updatedAt: Date;
+  userId: string;
+};
+
+// For form display/edit (decrypted)
+type CredentialWithValue = {
+  id: string;
+  name: string;
+  type: CredentialType;
+  createdAt: Date;
+  updatedAt: Date;
+  userId: string;
+  encryptedValue: string;
+  iv: string;
+  keyVersion: number;
+  value: string;
+};
 
 export const credentialsRouter = createTRPCRouter({
   create: premiumProcedure
@@ -15,13 +40,15 @@ export const credentialsRouter = createTRPCRouter({
     )
     .mutation(({ ctx, input }) => {
       const { name, value, type } = input;
+      const { encryptedValue, iv } = encrypt(value);
 
       return prisma.credential.create({
         data: {
           name,
           userId: ctx.auth.user.id,
           type,
-          value,
+          encryptedValue,
+          iv,
         },
       });
     }),
@@ -44,25 +71,42 @@ export const credentialsRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const { id, name, type, value } = input;
+      const { encryptedValue, iv } = encrypt(value);
 
       return prisma.credential.update({
-        where: { id, userId: ctx.auth.id },
+        where: { id, userId: ctx.auth.user.id },
         data: {
           name,
           type,
-          value,
+          encryptedValue,
+          iv,
         },
       });
     }),
 
-  getOne: protectedProcedure.input(z.object({ id: z.string() })).query(({ ctx, input }) => {
-    return prisma.credential.findUniqueOrThrow({
-      where: {
-        id: input.id,
-        userId: ctx.auth.user.id,
-      },
-    });
-  }),
+  getOne: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ ctx, input }): Promise<CredentialWithValue | null> => {
+      const cred = await prisma.credential.findUnique({
+        where: {
+          id: input.id,
+          userId: ctx.auth.user.id,
+        },
+      });
+      if (!cred) return null;
+      return {
+        id: cred.id,
+        name: cred.name,
+        type: cred.type,
+        createdAt: cred.createdAt,
+        updatedAt: cred.updatedAt,
+        userId: cred.userId,
+        encryptedValue: cred.encryptedValue,
+        iv: cred.iv,
+        keyVersion: cred.keyVersion,
+        value: decrypt(cred.encryptedValue, cred.iv),
+      };
+    }),
   getMany: protectedProcedure
     .input(
       z.object({
@@ -91,6 +135,14 @@ export const credentialsRouter = createTRPCRouter({
           orderBy: {
             updatedAt: 'desc',
           },
+          select: {
+            id: true,
+            name: true,
+            type: true,
+            createdAt: true,
+            updatedAt: true,
+            userId: true,
+          },
         }),
         prisma.credential.count({
           where: {
@@ -99,17 +151,15 @@ export const credentialsRouter = createTRPCRouter({
         }),
       ]);
       const totalPages = Math.ceil(totalCount / pageSize);
-      const hasNestPage = page < totalPages;
-      const hasPreviousPage = page > 1;
 
       return {
-        items,
+        items: items as CredentialListItem[],
         page,
         pageSize,
         totalCount,
         totalPages,
-        hasNestPage,
-        hasPreviousPage,
+        hasNestPage: page < totalPages,
+        hasPreviousPage: page > 1,
       };
     }),
   getByType: protectedProcedure
@@ -123,6 +173,10 @@ export const credentialsRouter = createTRPCRouter({
         },
         orderBy: {
           updatedAt: 'desc',
+        },
+        select: {
+          id: true,
+          name: true,
         },
       });
     }),

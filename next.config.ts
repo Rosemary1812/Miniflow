@@ -28,7 +28,7 @@ export default withSentryConfig(nextConfig, {
 
   org: 'innsingt',
 
-  project: 'n9n',
+  project: 'miniflow',
 
   // Only print logs for uploading source maps in CI
   silent: !process.env.CI,

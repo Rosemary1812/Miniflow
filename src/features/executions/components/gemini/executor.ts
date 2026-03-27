@@ -5,6 +5,7 @@ import { geminiChannel } from '@/inngest/channels/gemini';
 import { generateText } from 'ai';
 import { NonRetriableError } from 'inngest';
 import prisma from '@/lib/db';
+import { decrypt } from '@/lib/crypto';
 
 Handlebars.registerHelper('json', context => {
   const jsonString = JSON.stringify(context, null, 2);
@@ -16,6 +17,8 @@ type GeminiNodeData = {
   credentialId?: string;
   systemPrompt?: string;
   userPrompt?: string;
+  baseURL?: string; // optional, for compatible providers like Groq, OpenRouter
+  model?: string; // optional, defaults to 'gemini-2.0-flash'
 };
 export const geminiExecutor: NodeExecutor<GeminiNodeData> = async ({
   data,
@@ -67,17 +70,22 @@ export const geminiExecutor: NodeExecutor<GeminiNodeData> = async ({
   if (!credential) {
     throw new NonRetriableError('Gemini node:CredentialId is not found');
   }
+
+  // Decrypt the stored API key
+  const apiKey = decrypt(credential.encryptedValue, credential.iv);
+
   const google = createGoogleGenerativeAI({
-    apiKey: credential.value,
+    apiKey,
+    ...(data.baseURL && { baseURL: data.baseURL }),
   });
   try {
     const { steps } = await step.ai.wrap('gemini-generate-text', generateText, {
-      model: google('gemini-2.0-flash'),
+      model: google(data.model || 'gemini-2.0-flash'),
       system: systemPrompt,
       prompt: userPrompt,
       experimental_telemetry: {
-        inEnabled: true,
-        recordInputs: true,
+        isEnabled: true,
+        recordInputs: false, // Disabled to prevent API key from appearing in logs
         recordOutputs: true,
       },
     });

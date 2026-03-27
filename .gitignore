@@ -23,6 +23,17 @@
 # misc
 .DS_Store
 *.pem
+*.log
+
+# project docs — contains sensitive planning info
+plan.md
+exm.md
+stack.md
+INTERVIEW.md
+
+# prisma migrations — do not commit migration history, only the lock file
+prisma/migrations/
+!prisma/migrations/migration_lock.toml
 
 # debug
 npm-debug.log*
@@ -30,8 +41,13 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# env files
+.env
+.env.local
+.env.production
+.env.development
+.env.*.local
+!.env.example  # allow .env.example to be committed
 
 # vercel
 .vercel

@@ -73,7 +73,7 @@ export const discordExecutor: NodeExecutor<DiscordData> = async ({
         throw new NonRetriableError('Discord webhookUrl is missing');
       }
       return {
-        ...content,
+        ...(context as Record<string, unknown>),
         [data.variableName]: {
           messageContent: content.slice(0, 2000),
         },

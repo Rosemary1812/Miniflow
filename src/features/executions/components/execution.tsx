@@ -12,7 +12,6 @@ import { Button } from '@/components/ui/button';
 import { CardTitle, Card, CardContent, CardHeader, CardDescription } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useSuspenseExecution } from '../hooks/use-executions';
-import { exec } from 'child_process';
 
 const getStatusIcon = (status: ExecutionStatus) => {
   switch (status) {
@@ -32,11 +31,11 @@ const formaStatus = (status: ExecutionStatus) => {
 };
 
 export const ExecutionView = ({ executionId }: { executionId: string }) => {
-  const { data: execution } = useSuspenseExecution({ executionId });
+  const { data: execution } = useSuspenseExecution(executionId);
   const [showStackTrace, setShowStackTrace] = useState(false);
 
-  const duration = data.completedAt
-    ? Math.round((new Date(data.completedAt).getTime() - new Date(data.startedAt).getTime()) / 1000)
+  const duration = execution.completedAt
+    ? Math.round((new Date(execution.completedAt).getTime() - new Date(execution.startedAt).getTime()) / 1000)
     : null;
 
   return (
@@ -46,7 +45,7 @@ export const ExecutionView = ({ executionId }: { executionId: string }) => {
           {getStatusIcon(execution.status)}
           <div>
             <CardTitle>{formaStatus(execution.status)}</CardTitle>
-            <CardDescription>Execution for {execution.workflow.name}</CardDescription>
+            <CardDescription>Execution for {execution.workflow?.name}</CardDescription>
           </div>
         </div>
       </CardHeader>
@@ -61,7 +60,7 @@ export const ExecutionView = ({ executionId }: { executionId: string }) => {
                 className="text-sm hover:underline text-primary"
                 href={`/workflows/${execution.workflowId}`}
               >
-                {execution.workflow.name}
+                {execution.workflow?.name ?? 'Unknown workflow'}
               </Link>
             </div>
             <div>
