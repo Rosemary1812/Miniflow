@@ -8,7 +8,6 @@ import {
 } from '../hooks/use-credentials';
 import { useRouter, useParams } from 'next/navigation';
 import Image from 'next/image';
-import { useUpgradeModal } from '@/hooks/use-upgarde-modal';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import z from 'zod';
@@ -72,7 +71,6 @@ export const CredentialForm = ({ initialData }: CredentialFormProps) => {
   const router = useRouter();
   const createCredential = useCreateCredential();
   const updateCredential = useUpdateCredential();
-  const { handleError, modal } = useUpgradeModal();
 
   const isEdit = !!initialData?.id;
 
@@ -95,15 +93,11 @@ export const CredentialForm = ({ initialData }: CredentialFormProps) => {
         onSuccess: data => {
           router.push(`/credentials/${data.id}`);
         },
-        onError: error => {
-          handleError(error);
-        },
       });
     }
   };
   return (
     <>
-      {modal}
       <Card>
         <CardHeader>
           <CardTitle>{isEdit ? 'Edit Credential' : 'Create Credential'}</CardTitle>

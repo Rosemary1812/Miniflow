@@ -1,5 +1,6 @@
 import { auth } from '@/lib/auth';
 import { polarClient } from '@/lib/polar';
+import { ensureDefaultWorkspace } from '@/lib/workspace';
 import { initTRPC, TRPCError } from '@trpc/server';
 import { headers } from 'next/headers';
 import { cache } from 'react';
@@ -35,7 +36,15 @@ export const protectedProcedure = baseProcedure.use(async ({ ctx, next }) => {
       message: 'Unathorized',
     });
   }
-  return next({ ctx: { ...ctx, auth: session } });
+  const membership = await ensureDefaultWorkspace(session.user);
+  return next({
+    ctx: {
+      ...ctx,
+      auth: session,
+      workspaceId: membership.workspaceId,
+      workspaceRole: membership.role,
+    },
+  });
 });
 export const premiumProcedure = protectedProcedure.use(async ({ ctx, next }) => {
   const customer = await polarClient.customers.getStateExternal({

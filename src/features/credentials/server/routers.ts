@@ -1,8 +1,9 @@
-import { createTRPCRouter, premiumProcedure, protectedProcedure } from '@/app/trpc/init';
+import { createTRPCRouter, protectedProcedure } from '@/app/trpc/init';
 import { PAGINATION } from '@/config/constants';
 import prisma from '@/lib/db';
 import { encrypt, decrypt } from '@/lib/crypto';
-import { CredentialType } from '@prisma/client';
+import { requireWorkspaceRole } from '@/lib/workspace';
+import { CredentialType, WorkspaceRole } from '@prisma/client';
 import z from 'zod';
 
 // Exclude sensitive fields from list responses
@@ -13,6 +14,7 @@ type CredentialListItem = {
   createdAt: Date;
   updatedAt: Date;
   userId: string;
+  workspaceId: string;
 };
 
 // For form display/edit (decrypted)
@@ -23,6 +25,7 @@ type CredentialWithValue = {
   createdAt: Date;
   updatedAt: Date;
   userId: string;
+  workspaceId: string;
   encryptedValue: string;
   iv: string;
   keyVersion: number;
@@ -30,21 +33,29 @@ type CredentialWithValue = {
 };
 
 export const credentialsRouter = createTRPCRouter({
-  create: premiumProcedure
+  create: protectedProcedure
     .input(
       z.object({
         name: z.string().min(1, 'Name is required'),
+        workspaceId: z.string().optional(),
         type: z.enum(CredentialType),
         value: z.string().min(1, 'Value is required'),
       }),
     )
-    .mutation(({ ctx, input }) => {
+    .mutation(async ({ ctx, input }) => {
       const { name, value, type } = input;
+      const workspaceId = input.workspaceId ?? ctx.workspaceId;
+      await requireWorkspaceRole({
+        userId: ctx.auth.user.id,
+        workspaceId,
+        minRole: WorkspaceRole.EDITOR,
+      });
       const { encryptedValue, iv } = encrypt(value);
 
       return prisma.credential.create({
         data: {
           name,
+          workspaceId,
           userId: ctx.auth.user.id,
           type,
           encryptedValue,
@@ -52,14 +63,21 @@ export const credentialsRouter = createTRPCRouter({
         },
       });
     }),
-  remove: protectedProcedure.input(z.object({ id: z.string() })).mutation(({ ctx, input }) => {
-    return prisma.credential.delete({
-      where: {
-        id: input.id,
+  remove: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const credential = await prisma.credential.findUniqueOrThrow({ where: { id: input.id } });
+      await requireWorkspaceRole({
         userId: ctx.auth.user.id,
-      },
-    });
-  }),
+        workspaceId: credential.workspaceId,
+        minRole: WorkspaceRole.OWNER,
+      });
+      return prisma.credential.delete({
+        where: {
+          id: input.id,
+        },
+      });
+    }),
   update: protectedProcedure
     .input(
       z.object({
@@ -71,10 +89,16 @@ export const credentialsRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const { id, name, type, value } = input;
+      const credential = await prisma.credential.findUniqueOrThrow({ where: { id } });
+      await requireWorkspaceRole({
+        userId: ctx.auth.user.id,
+        workspaceId: credential.workspaceId,
+        minRole: WorkspaceRole.EDITOR,
+      });
       const { encryptedValue, iv } = encrypt(value);
 
       return prisma.credential.update({
-        where: { id, userId: ctx.auth.user.id },
+        where: { id },
         data: {
           name,
           type,
@@ -90,10 +114,14 @@ export const credentialsRouter = createTRPCRouter({
       const cred = await prisma.credential.findUnique({
         where: {
           id: input.id,
-          userId: ctx.auth.user.id,
         },
       });
       if (!cred) return null;
+      await requireWorkspaceRole({
+        userId: ctx.auth.user.id,
+        workspaceId: cred.workspaceId,
+        minRole: WorkspaceRole.VIEWER,
+      });
       return {
         id: cred.id,
         name: cred.name,
@@ -101,6 +129,7 @@ export const credentialsRouter = createTRPCRouter({
         createdAt: cred.createdAt,
         updatedAt: cred.updatedAt,
         userId: cred.userId,
+        workspaceId: cred.workspaceId,
         encryptedValue: cred.encryptedValue,
         iv: cred.iv,
         keyVersion: cred.keyVersion,
@@ -116,17 +145,24 @@ export const credentialsRouter = createTRPCRouter({
           .min(PAGINATION.MIN_PAGE_SIZE)
           .max(PAGINATION.MAX_PAGE_SIZE)
           .default(PAGINATION.DEFAULT_PAGE_SIZE),
+        workspaceId: z.string().optional(),
         search: z.string().default(''),
       }),
     )
     .query(async ({ ctx, input }) => {
       const { page, pageSize, search } = input;
+      const workspaceId = input.workspaceId ?? ctx.workspaceId;
+      await requireWorkspaceRole({
+        userId: ctx.auth.user.id,
+        workspaceId,
+        minRole: WorkspaceRole.VIEWER,
+      });
       const [items, totalCount] = await Promise.all([
         prisma.credential.findMany({
           skip: (page - 1) * pageSize,
           take: pageSize,
           where: {
-            userId: ctx.auth.user.id,
+            workspaceId,
             name: {
               contains: search,
               mode: 'insensitive',
@@ -142,11 +178,12 @@ export const credentialsRouter = createTRPCRouter({
             createdAt: true,
             updatedAt: true,
             userId: true,
+            workspaceId: true,
           },
         }),
         prisma.credential.count({
           where: {
-            userId: ctx.auth.user.id,
+            workspaceId,
           },
         }),
       ]);
@@ -164,11 +201,16 @@ export const credentialsRouter = createTRPCRouter({
     }),
   getByType: protectedProcedure
     .input(z.object({ type: z.enum(CredentialType) }))
-    .query(({ ctx, input }) => {
+    .query(async ({ ctx, input }) => {
       const { type } = input;
+      await requireWorkspaceRole({
+        userId: ctx.auth.user.id,
+        workspaceId: ctx.workspaceId,
+        minRole: WorkspaceRole.VIEWER,
+      });
       return prisma.credential.findMany({
         where: {
-          userId: ctx.auth.user.id,
+          workspaceId: ctx.workspaceId,
           type,
         },
         orderBy: {

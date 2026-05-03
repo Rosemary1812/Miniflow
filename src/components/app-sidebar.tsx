@@ -9,6 +9,7 @@ import {
   KeyIcon,
   LogOutIcon,
   StarIcon,
+  UsersIcon,
 } from 'lucide-react';
 
 import Link from 'next/link';
@@ -27,6 +28,7 @@ import {
 } from '@/components/ui/sidebar';
 import { authClient } from '@/lib/auth-client';
 import { useHasActiveSubscription } from '@/features/subscriptions/hooks/use-subscription';
+import { WorkspaceSwitcher } from '@/features/workspaces/components/workspace-switcher';
 const menuItems = [
   {
     title: 'Main',
@@ -56,6 +58,11 @@ const menuItems = [
         icon: FileTextIcon,
         href: '/templates',
       },
+      {
+        title: 'Workspaces',
+        icon: UsersIcon,
+        href: '/workspaces',
+      },
     ],
   },
 ];
@@ -74,6 +81,7 @@ export const AppSidebar = () => {
             </Link>
           </SidebarMenuButton>
         </SidebarMenuItem>
+        <WorkspaceSwitcher />
       </SidebarHeader>
       <SidebarContent>
         {menuItems.map(group => (

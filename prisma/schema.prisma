@@ -8,18 +8,25 @@ datasource db {
 }
 
 model User {
-  id            String       @id @default(cuid())
-  email         String       @unique
-  name          String
-  posts         Post[]
-  emailVerified Boolean      @default(false)
-  image         String?
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-  sessions      Session[]
-  accounts      Account[]
-  workflows     Workflow[]
-  credentials   Credential[]
+  id                      String               @id @default(cuid())
+  email                   String               @unique
+  name                    String
+  posts                   Post[]
+  emailVerified           Boolean              @default(false)
+  image                   String?
+  createdAt               DateTime             @default(now())
+  updatedAt               DateTime             @updatedAt
+  sessions                Session[]
+  accounts                Account[]
+  workflows               Workflow[]
+  credentials             Credential[]
+  defaultWorkspaceId      String?
+  defaultWorkspace        Workspace?           @relation("DefaultWorkspace", fields: [defaultWorkspaceId], references: [id])
+  ownedWorkspaces         Workspace[]          @relation("WorkspaceOwner")
+  workspaceMemberships    WorkspaceMember[]
+  workspaceInvitesCreated WorkspaceInvite[]    @relation("WorkspaceInviteCreator")
+  workflowVersionsCreated WorkflowVersion[]    @relation("WorkflowVersionCreator")
+  workflowPublishLogs     WorkflowPublishLog[] @relation("WorkflowPublisher")
 
   @@map("user")
 }
@@ -83,9 +90,11 @@ model Verification {
 
 model Credential {
   id             String         @id @default(cuid())
+  workspaceId    String
+  workspace      Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   name           String
-  encryptedValue String         // AES-256-GCM encrypted API key
-  iv             String         // Initialization vector (16 bytes hex)
+  encryptedValue String // AES-256-GCM encrypted API key
+  iv             String // Initialization vector (16 bytes hex)
   keyVersion     Int            @default(1) // Encryption key version for rotation
   type           CredentialType
 
@@ -98,6 +107,7 @@ model Credential {
   Node Node[]
 
   // Hide plaintext value from Prisma queries by default
+  @@index([workspaceId])
   @@map("credential")
 }
 
@@ -108,18 +118,27 @@ enum CredentialType {
 }
 
 model Workflow {
-  id        String   @id @default(cuid())
-  name      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                 String           @id @default(cuid())
+  workspaceId        String
+  workspace          Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name               String
+  draftVersionId     String?          @unique
+  draftVersion       WorkflowVersion? @relation("WorkflowDraftVersion", fields: [draftVersionId], references: [id])
+  publishedVersionId String?          @unique
+  publishedVersion   WorkflowVersion? @relation("WorkflowPublishedVersion", fields: [publishedVersionId], references: [id])
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
 
-  nodes       Node[]
-  connections Connection[]
-  executions  Execution[]
+  nodes             Node[]
+  connections       Connection[]
+  executions        Execution[]
   scheduledWorkflow ScheduledWorkflow?
+  versions          WorkflowVersion[]  @relation("WorkflowVersions")
 
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
 }
 
 enum NodeType {
@@ -138,15 +157,19 @@ enum NodeType {
 }
 
 model ScheduledWorkflow {
-  id          String   @id @default(cuid())
-  workflowId  String   @unique
-  workflow    Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
-  cron        String   // cron expression, e.g. "*/5 * * * *"
-  timezone    String   @default("UTC")
-  active      Boolean  @default(true)
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workflowId  String    @unique
+  workflow    Workflow  @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  cron        String // cron expression, e.g. "*/5 * * * *"
+  timezone    String    @default("UTC")
+  active      Boolean   @default(true)
   nextRunAt   DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([workspaceId])
 }
 
 model Node {
@@ -154,10 +177,15 @@ model Node {
   workflowId String
   workflow   Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
 
-  name     String
-  type     NodeType
-  position Json
-  data     Json     @default("{ }")
+  name             String
+  type             NodeType
+  position         Json
+  data             Json          @default("{ }")
+  retryEnabled     Boolean       @default(false)
+  retryMaxAttempts Int           @default(1)
+  retryStrategy    RetryStrategy @default(fixed)
+  retryBaseDelayMs Int           @default(1000)
+  retryMaxDelayMs  Int           @default(30000)
 
   outputConnections Connection[] @relation("FromNode")
   inputConnections  Connection[] @relation("ToNode")
@@ -194,9 +222,13 @@ enum ExecutionStatus {
 }
 
 model Execution {
-  id         String    @id @default(cuid())
-  workflowId String
-  workflow   Workflow? @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  id                String          @id @default(cuid())
+  workspaceId       String
+  workspace         Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workflowId        String
+  workflow          Workflow?       @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  workflowVersionId String
+  workflowVersion   WorkflowVersion @relation(fields: [workflowVersionId], references: [id])
 
   status     ExecutionStatus @default(RUNNING)
   error      String?         @db.Text
@@ -208,6 +240,160 @@ model Execution {
   inngestEventId String @unique
 
   output Json?
+  nodes  ExecutionNode[]
+
+  @@index([workspaceId])
+  @@index([workflowVersionId])
+}
+
+model Workspace {
+  id                 String              @id @default(cuid())
+  name               String
+  slug               String              @unique
+  ownerId            String
+  owner              User                @relation("WorkspaceOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  defaultForUsers    User[]              @relation("DefaultWorkspace")
+  members            WorkspaceMember[]
+  invites            WorkspaceInvite[]
+  workflows          Workflow[]
+  credentials        Credential[]
+  executions         Execution[]
+  scheduledWorkflows ScheduledWorkflow[]
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  @@index([ownerId])
+}
+
+model WorkspaceMember {
+  id          String        @id @default(cuid())
+  workspaceId String
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role        WorkspaceRole
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
+}
+
+model WorkspaceInvite {
+  id          String        @id @default(cuid())
+  workspaceId String
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  email       String
+  role        WorkspaceRole
+  token       String        @unique
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  createdBy   String
+  creator     User          @relation("WorkspaceInviteCreator", fields: [createdBy], references: [id], onDelete: Cascade)
+  createdAt   DateTime      @default(now())
+
+  @@index([workspaceId])
+  @@index([email])
+}
+
+model WorkflowVersion {
+  id                   String                @id @default(cuid())
+  workflowId           String
+  workflow             Workflow              @relation("WorkflowVersions", fields: [workflowId], references: [id], onDelete: Cascade)
+  draftForWorkflow     Workflow?             @relation("WorkflowDraftVersion")
+  publishedForWorkflow Workflow?             @relation("WorkflowPublishedVersion")
+  version              Int
+  name                 String
+  nodes                Json
+  connections          Json
+  status               WorkflowVersionStatus
+  createdBy            String
+  creator              User                  @relation("WorkflowVersionCreator", fields: [createdBy], references: [id], onDelete: Cascade)
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  executions           Execution[]
+  publishLogs          WorkflowPublishLog[]
+
+  @@unique([workflowId, version])
+  @@index([status])
+}
+
+model WorkflowPublishLog {
+  id                String          @id @default(cuid())
+  workflowVersionId String
+  workflowVersion   WorkflowVersion @relation(fields: [workflowVersionId], references: [id], onDelete: Cascade)
+  publishedBy       String
+  publisher         User            @relation("WorkflowPublisher", fields: [publishedBy], references: [id], onDelete: Cascade)
+  publishedAt       DateTime        @default(now())
+  note              String?
+
+  @@index([workflowVersionId])
+}
+
+model ExecutionNode {
+  id                   String              @id @default(cuid())
+  executionId          String
+  execution            Execution           @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  nodeId               String
+  nodeType             NodeType
+  nodeName             String
+  attempt              Int                 @default(1)
+  retryCount           Int                 @default(0)
+  retryEnabled         Boolean             @default(false)
+  maxAttempts          Int                 @default(1)
+  retryStrategy        RetryStrategy?
+  baseDelayMs          Int?
+  maxDelayMs           Int?
+  lastError            String?             @db.Text
+  nextRetryAt          DateTime?
+  status               ExecutionNodeStatus
+  input                Json?
+  output               Json?
+  error                String?             @db.Text
+  errorStack           String?             @db.Text
+  startedAt            DateTime?
+  completedAt          DateTime?
+  durationMs           Int?
+  provider             String?
+  model                String?
+  systemPrompt         String?             @db.Text
+  userPrompt           String?             @db.Text
+  resolvedPrompt       String?             @db.Text
+  responseText         String?             @db.Text
+  tokenUsagePrompt     Int?
+  tokenUsageCompletion Int?
+  tokenUsageTotal      Int?
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+
+  @@index([executionId])
+  @@index([nodeId])
+}
+
+enum WorkspaceRole {
+  OWNER
+  EDITOR
+  VIEWER
+}
+
+enum WorkflowVersionStatus {
+  DRAFT
+  PENDING_REVIEW
+  PUBLISHED
+  REJECTED
+}
+
+enum ExecutionNodeStatus {
+  PENDING
+  RUNNING
+  SUCCESS
+  FAILED
+  SKIPPED
+}
+
+enum RetryStrategy {
+  fixed
+  exponential
 }
 
 model WorkflowTemplate {
@@ -217,7 +403,7 @@ model WorkflowTemplate {
   category    String   @default("general")
   nodes       Json
   edges       Json
-  isBuiltIn   Boolean @default(false)
+  isBuiltIn   Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
