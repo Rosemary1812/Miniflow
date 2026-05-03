@@ -58,5 +58,9 @@ next-env.d.ts
 
 /src/generated/prisma
 
+# local agent workbenches
+.hydra/
+.worktrees/
+
 # Sentry Config File
 .env.sentry-build-plugin
