@@ -1,9 +1,10 @@
 import { createTRPCRouter, protectedProcedure } from '@/app/trpc/init';
 import prisma from '@/lib/db';
+import { requireWorkspaceRole } from '@/lib/workspace';
 import z from 'zod';
 import { createId } from '@paralleldrive/cuid2';
 import type { Node } from '@xyflow/react';
-import type { NodeType } from '@prisma/client';
+import { NodeType, Prisma, WorkflowVersionStatus, WorkspaceRole } from '@prisma/client';
 
 // Connection data stored in DB (after transformation by seed.ts)
 interface ConnectionData {
@@ -68,9 +69,10 @@ export const templateRouter = createTRPCRouter({
         return {
           id: newId,
           // Use readable name from type enum, fallback to type value
-          name: (node.type && node.type in NODE_TYPE_LABELS)
-            ? NODE_TYPE_LABELS[node.type as NodeType]
-            : (node.type || 'Node'),
+          name:
+            node.type && node.type in NODE_TYPE_LABELS
+              ? NODE_TYPE_LABELS[node.type as NodeType]
+              : node.type || 'Node',
           type: node.type || 'unknown',
           position: node.position,
           data: node.data || {},
@@ -85,19 +87,63 @@ export const templateRouter = createTRPCRouter({
         toInput: edge.toInput,
       }));
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return prisma.workflow.create({
-        data: {
-          name: input.name || template.name,
-          userId: ctx.auth.user.id,
-          nodes: {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            create: newNodes as any,
+      await requireWorkspaceRole({
+        userId: ctx.auth.user.id,
+        workspaceId: ctx.workspaceId,
+        minRole: WorkspaceRole.EDITOR,
+      });
+
+      return prisma.$transaction(async tx => {
+        const workflow = await tx.workflow.create({
+          data: {
+            name: input.name || template.name,
+            userId: ctx.auth.user.id,
+            workspaceId: ctx.workspaceId,
+            nodes: {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              create: newNodes as any,
+            },
+            connections: {
+              create: newEdges,
+            },
           },
-          connections: {
-            create: newEdges,
+        });
+
+        const draftVersion = await tx.workflowVersion.create({
+          data: {
+            workflowId: workflow.id,
+            version: 1,
+            name: workflow.name,
+            nodes: JSON.parse(
+              JSON.stringify(
+                newNodes.map(node => ({
+                  id: node.id,
+                  type: node.type,
+                  position: node.position,
+                  data: node.data,
+                })),
+              ),
+            ) as Prisma.InputJsonValue,
+            connections: JSON.parse(
+              JSON.stringify(
+                newEdges.map(edge => ({
+                  id: edge.id,
+                  source: edge.fromNodeId,
+                  target: edge.toNodeId,
+                  sourceHandle: edge.fromOutput,
+                  targetHandle: edge.toInput,
+                })),
+              ),
+            ) as Prisma.InputJsonValue,
+            status: WorkflowVersionStatus.DRAFT,
+            createdBy: ctx.auth.user.id,
           },
-        },
+        });
+
+        return tx.workflow.update({
+          where: { id: workflow.id },
+          data: { draftVersionId: draftVersion.id },
+        });
       });
     }),
 });

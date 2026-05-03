@@ -1,12 +1,16 @@
 // Hooks to fetch all workflows using suspense
 
 import { useTRPC } from '@/app/trpc/client';
-import { useSuspenseQuery, QueryClient, useQueryClient, useMutation } from '@tanstack/react-query';
-import { useRouter } from 'next/navigation';
+import { useSuspenseQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useWorkflowsParams } from './use-workflows-params';
-import { trpc } from '@/app/trpc/server';
-import { use } from 'react';
+
+const toWorkflowErrorMessage = (message: string) => {
+  if (message.includes('ResourceNotFound') || message.includes('Polar')) {
+    return 'Workflow creation is currently unavailable. Please try again or contact support.';
+  }
+  return message;
+};
 
 export const useSuspenseWorkflows = () => {
   const trpc = useTRPC();
@@ -19,7 +23,6 @@ export const useSuspenseWorkflows = () => {
 export const useCreateWorkflow = () => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const router = useRouter();
   return useMutation(
     trpc.workflows.create.mutationOptions({
       onSuccess: data => {
@@ -27,7 +30,7 @@ export const useCreateWorkflow = () => {
         queryClient.invalidateQueries(trpc.workflows.getMany.queryOptions({}));
       },
       onError: error => {
-        toast.error(`Failed to create workflow: ${error.message}`);
+        toast.error(`Failed to create workflow: ${toWorkflowErrorMessage(error.message)}`);
       },
     }),
   );
@@ -103,6 +106,51 @@ export const useExecuteWorkflow = () => {
       onError: error => {
         toast.error(`Failed to execute workflow: ${error.message}`);
       },
+    }),
+  );
+};
+
+export const useSubmitWorkflowReview = () => {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  return useMutation(
+    trpc.workflows.submitReview.mutationOptions({
+      onSuccess: data => {
+        toast.success('Workflow submitted for review');
+        queryClient.invalidateQueries(trpc.workflows.getOne.queryOptions({ id: data.workflowId }));
+        queryClient.invalidateQueries(trpc.workflows.getMany.queryOptions({}));
+      },
+      onError: error => toast.error(`Failed to submit review: ${error.message}`),
+    }),
+  );
+};
+
+export const useApproveWorkflow = () => {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  return useMutation(
+    trpc.workflows.approve.mutationOptions({
+      onSuccess: data => {
+        toast.success('Workflow published');
+        queryClient.invalidateQueries(trpc.workflows.getOne.queryOptions({ id: data.workflowId }));
+        queryClient.invalidateQueries(trpc.workflows.getMany.queryOptions({}));
+      },
+      onError: error => toast.error(`Failed to publish workflow: ${error.message}`),
+    }),
+  );
+};
+
+export const useRejectWorkflow = () => {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  return useMutation(
+    trpc.workflows.reject.mutationOptions({
+      onSuccess: data => {
+        toast.success('Workflow review rejected');
+        queryClient.invalidateQueries(trpc.workflows.getOne.queryOptions({ id: data.workflowId }));
+        queryClient.invalidateQueries(trpc.workflows.getMany.queryOptions({}));
+      },
+      onError: error => toast.error(`Failed to reject workflow: ${error.message}`),
     }),
   );
 };
