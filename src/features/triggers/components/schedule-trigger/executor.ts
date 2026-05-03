@@ -28,9 +28,11 @@ export const scheduleTriggerExecutor: NodeExecutor<ScheduleTriggerData> = async 
 
     // Extract workflowId from context or node data
     const workflowId = (context as Record<string, unknown>).workflowId as string;
-    if (workflowId) {
+    const workspaceId = (context as Record<string, unknown>).workspaceId as string;
+    if (workflowId && workspaceId) {
       await upsertScheduledWorkflow({
         workflowId,
+        workspaceId,
         cron: data.cron,
         timezone: data.timezone || 'UTC',
       });

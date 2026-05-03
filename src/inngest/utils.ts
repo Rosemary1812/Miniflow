@@ -36,10 +36,34 @@ export const topologicalSort = (nodes: Node[], connections: Connection[]): Node[
   return sortedNodeIds.map(id => nodeMap.get(id)!).filter(Boolean);
 };
 
-export const sendWorkflowExecution = async (data: { workflowId: string; [key: string]: any }) => {
+export const sendWorkflowExecution = async (data: {
+  workflowId: string;
+  workspaceId?: string;
+  workflowVersionId?: string;
+  [key: string]: any;
+}) => {
+  const workflow =
+    data.workspaceId && data.workflowVersionId
+      ? null
+      : await prisma.workflow.findUnique({
+          where: { id: data.workflowId },
+          select: { workspaceId: true, publishedVersionId: true },
+        });
+
+  const workspaceId = data.workspaceId ?? workflow?.workspaceId;
+  const workflowVersionId = data.workflowVersionId ?? workflow?.publishedVersionId;
+
+  if (!workspaceId || !workflowVersionId) {
+    throw new Error('Workflow must have a published version before execution');
+  }
+
   return inngest.send({
     name: 'workflows/execute.workflow',
-    data,
+    data: {
+      ...data,
+      workspaceId,
+      workflowVersionId,
+    },
     id: createId(),
   });
 };
@@ -48,8 +72,10 @@ export const upsertScheduledWorkflow = async ({
   workflowId,
   cron,
   timezone,
+  workspaceId,
 }: {
   workflowId: string;
+  workspaceId: string;
   cron: string;
   timezone: string;
 }) => {
@@ -57,7 +83,7 @@ export const upsertScheduledWorkflow = async ({
   return prisma.scheduledWorkflow.upsert({
     where: { workflowId },
     update: { cron, timezone, nextRunAt, active: true },
-    create: { workflowId, cron, timezone, nextRunAt, active: true },
+    create: { workflowId, workspaceId, cron, timezone, nextRunAt, active: true },
   });
 };
 
@@ -74,7 +100,8 @@ export const calculateNextRun = (cron: string, timezone: string): Date => {
 
   const [minuteStr, hourStr, dayStr, monthStr, weekdayStr] = parts;
 
-  let minute = 0, hour = 0;
+  let minute = 0,
+    hour = 0;
 
   if (minuteStr.startsWith('*/')) {
     const interval = parseInt(minuteStr.slice(2));

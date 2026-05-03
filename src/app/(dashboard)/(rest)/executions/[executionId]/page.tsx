@@ -18,7 +18,7 @@ const Page = async ({ params }: PageProps) => {
 
   return (
     <div className="p-4 md:px-10 md:py-6 h-full">
-      <div className="mx-auto max-w-screen-md w-full flex flex-col gap-y-8 h-full">
+      <div className="mx-auto flex h-full w-full max-w-screen-2xl flex-col gap-y-8">
         <HydrateClient>
           <ErrorBoundary fallback={<ExecutionsError />}>
             <Suspense fallback={<ExecutionsLoading />}>

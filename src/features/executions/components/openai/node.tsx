@@ -3,7 +3,7 @@
 import { Node, NodeProps, useReactFlow } from '@xyflow/react';
 import { memo, useState } from 'react';
 import { BaseExecutionNode } from '../base-execution-node';
-import { OpenAiFormValues, OpenAIDialog, OpenAIFormValues } from './dialog';
+import { OpenAIDialog, OpenAIFormValues } from './dialog';
 import { useNodeStatus } from '@/features/executions/hooks/use-node-status';
 import { fetchOpenAiRealtimeToken } from './actions';
 import { OPENAI_CHANNEL_NAME } from '@/inngest/channels/openai';

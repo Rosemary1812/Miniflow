@@ -1,7 +1,7 @@
 // Hooks to fetch all workflows using suspense
 
 import { useTRPC } from '@/app/trpc/client';
-import { useSuspenseQuery } from '@tanstack/react-query';
+import { useMutation, useSuspenseQuery } from '@tanstack/react-query';
 import { useExecutionsParams } from './use-executions-params';
 
 export const useSuspenseExecutions = () => {
@@ -14,4 +14,9 @@ export const useSuspenseExecutions = () => {
 export const useSuspenseExecution = (id: string) => {
   const trpc = useTRPC();
   return useSuspenseQuery(trpc.executions.getOne.queryOptions({ id }));
+};
+
+export const useRetryExecutionNode = () => {
+  const trpc = useTRPC();
+  return useMutation(trpc.executions.retryNode.mutationOptions());
 };

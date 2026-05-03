@@ -1,16 +1,17 @@
 import { createTRPCRouter, protectedProcedure } from '@/app/trpc/init';
 import { PAGINATION } from '@/config/constants';
 import prisma from '@/lib/db';
+import { requireWorkspaceRole } from '@/lib/workspace';
+import { sendWorkflowExecution } from '@/inngest/utils';
 import z from 'zod';
 import { subDays, startOfDay, format } from 'date-fns';
+import { ExecutionNodeStatus, WorkspaceRole } from '@prisma/client';
+import { TRPCError } from '@trpc/server';
 
 export const executionsRouter = createTRPCRouter({
-  getOne: protectedProcedure.input(z.object({ id: z.string() })).query(({ ctx, input }) => {
-    return prisma.execution.findUniqueOrThrow({
-      where: {
-        id: input.id,
-        workflow: { userId: ctx.auth.user.id },
-      },
+  getOne: protectedProcedure.input(z.object({ id: z.string() })).query(async ({ ctx, input }) => {
+    const execution = await prisma.execution.findUniqueOrThrow({
+      where: { id: input.id },
       include: {
         workflow: {
           select: {
@@ -18,12 +19,33 @@ export const executionsRouter = createTRPCRouter({
             name: true,
           },
         },
+        workflowVersion: {
+          select: {
+            id: true,
+            version: true,
+            status: true,
+            name: true,
+          },
+        },
+        nodes: {
+          orderBy: [{ createdAt: 'asc' }, { attempt: 'asc' }],
+        },
       },
     });
+
+    await requireWorkspaceRole({
+      userId: ctx.auth.user.id,
+      workspaceId: execution.workspaceId,
+      minRole: WorkspaceRole.VIEWER,
+    });
+
+    return execution;
   }),
+
   getMany: protectedProcedure
     .input(
       z.object({
+        workspaceId: z.string().optional(),
         page: z.number().default(PAGINATION.DEFAULT_PAGE),
         pageSize: z
           .number()
@@ -34,13 +56,18 @@ export const executionsRouter = createTRPCRouter({
     )
     .query(async ({ ctx, input }) => {
       const { page, pageSize } = input;
+      const workspaceId = input.workspaceId ?? ctx.workspaceId;
+      await requireWorkspaceRole({
+        userId: ctx.auth.user.id,
+        workspaceId,
+        minRole: WorkspaceRole.VIEWER,
+      });
+
       const [items, totalCount] = await Promise.all([
         prisma.execution.findMany({
           skip: (page - 1) * pageSize,
           take: pageSize,
-          where: {
-            workflow: { userId: ctx.auth.user.id },
-          },
+          where: { workspaceId },
           orderBy: {
             startedAt: 'desc',
           },
@@ -51,13 +78,19 @@ export const executionsRouter = createTRPCRouter({
                 name: true,
               },
             },
+            workflowVersion: {
+              select: { id: true, version: true, status: true },
+            },
+            nodes: {
+              select: {
+                id: true,
+                status: true,
+                error: true,
+              },
+            },
           },
         }),
-        prisma.execution.count({
-          where: {
-            workflow: { userId: ctx.auth.user.id },
-          },
-        }),
+        prisma.execution.count({ where: { workspaceId } }),
       ]);
       const totalPages = Math.ceil(totalCount / pageSize);
       const hasNestPage = page < totalPages;
@@ -74,34 +107,160 @@ export const executionsRouter = createTRPCRouter({
       };
     }),
 
+  getNodeLogs: protectedProcedure
+    .input(z.object({ executionId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const execution = await prisma.execution.findUniqueOrThrow({
+        where: { id: input.executionId },
+        select: { workspaceId: true },
+      });
+      await requireWorkspaceRole({
+        userId: ctx.auth.user.id,
+        workspaceId: execution.workspaceId,
+        minRole: WorkspaceRole.VIEWER,
+      });
+
+      return prisma.executionNode.findMany({
+        where: { executionId: input.executionId },
+        orderBy: [{ createdAt: 'asc' }, { attempt: 'asc' }],
+      });
+    }),
+
+  getNodeLog: protectedProcedure
+    .input(z.object({ executionNodeId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const node = await prisma.executionNode.findUniqueOrThrow({
+        where: { id: input.executionNodeId },
+        include: { execution: { select: { workspaceId: true } } },
+      });
+      await requireWorkspaceRole({
+        userId: ctx.auth.user.id,
+        workspaceId: node.execution.workspaceId,
+        minRole: WorkspaceRole.VIEWER,
+      });
+
+      return node;
+    }),
+
+  getNodeRetryState: protectedProcedure
+    .input(z.object({ executionNodeId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const node = await prisma.executionNode.findUniqueOrThrow({
+        where: { id: input.executionNodeId },
+        include: { execution: { select: { workspaceId: true } } },
+      });
+      await requireWorkspaceRole({
+        userId: ctx.auth.user.id,
+        workspaceId: node.execution.workspaceId,
+        minRole: WorkspaceRole.VIEWER,
+      });
+
+      return {
+        attempt: node.attempt,
+        retryCount: node.retryCount,
+        nextRetryAt: node.nextRetryAt,
+        lastError: node.lastError,
+        retryEnabled: node.retryEnabled,
+        maxAttempts: node.maxAttempts,
+      };
+    }),
+
+  retryNode: protectedProcedure
+    .input(z.object({ executionNodeId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const node = await prisma.executionNode.findUniqueOrThrow({
+        where: { id: input.executionNodeId },
+        include: {
+          execution: {
+            include: {
+              workflow: { select: { id: true, publishedVersionId: true } },
+            },
+          },
+        },
+      });
+
+      await requireWorkspaceRole({
+        userId: ctx.auth.user.id,
+        workspaceId: node.execution.workspaceId,
+        minRole: WorkspaceRole.EDITOR,
+      });
+
+      if (node.status !== ExecutionNodeStatus.FAILED) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Only failed nodes can be retried' });
+      }
+
+      return sendWorkflowExecution({
+        workflowId: node.execution.workflowId,
+        workspaceId: node.execution.workspaceId,
+        workflowVersionId: node.execution.workflowVersionId,
+        initialData: {
+          manualRetry: {
+            executionNodeId: node.id,
+            nodeId: node.nodeId,
+            context: node.input,
+          },
+        },
+      });
+    }),
+
+  retryFromNode: protectedProcedure
+    .input(z.object({ executionId: z.string(), nodeId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const execution = await prisma.execution.findUniqueOrThrow({
+        where: { id: input.executionId },
+      });
+      await requireWorkspaceRole({
+        userId: ctx.auth.user.id,
+        workspaceId: execution.workspaceId,
+        minRole: WorkspaceRole.EDITOR,
+      });
+
+      return sendWorkflowExecution({
+        workflowId: execution.workflowId,
+        workspaceId: execution.workspaceId,
+        workflowVersionId: execution.workflowVersionId,
+        initialData: {
+          manualRetry: {
+            executionId: execution.id,
+            nodeId: input.nodeId,
+          },
+        },
+      });
+    }),
+
   getAnalytics: protectedProcedure
     .input(
       z.object({
+        workspaceId: z.string().optional(),
         days: z.number().min(1).max(90).default(30),
       }),
     )
     .query(async ({ ctx, input }) => {
-      const userId = ctx.auth.user.id;
+      const workspaceId = input.workspaceId ?? ctx.workspaceId;
+      await requireWorkspaceRole({
+        userId: ctx.auth.user.id,
+        workspaceId,
+        minRole: WorkspaceRole.VIEWER,
+      });
       const since = subDays(new Date(), input.days);
 
-      // 1. Summary counts
       const [total, success, failed] = await Promise.all([
         prisma.execution.count({
           where: {
-            workflow: { userId },
+            workspaceId,
             startedAt: { gte: since },
           },
         }),
         prisma.execution.count({
           where: {
-            workflow: { userId },
+            workspaceId,
             status: 'SUCCESS',
             startedAt: { gte: since },
           },
         }),
         prisma.execution.count({
           where: {
-            workflow: { userId },
+            workspaceId,
             status: 'FAILED',
             startedAt: { gte: since },
           },
@@ -110,10 +269,9 @@ export const executionsRouter = createTRPCRouter({
 
       const successRate = total > 0 ? Math.round((success / total) * 100) : 0;
 
-      // 2. Daily trend — use findMany + JS aggregation instead of groupBy on DateTime
       const executions = await prisma.execution.findMany({
         where: {
-          workflow: { userId },
+          workspaceId,
           startedAt: { gte: since },
         },
         select: { status: true, startedAt: true },
@@ -130,19 +288,22 @@ export const executionsRouter = createTRPCRouter({
         const label = format(day, 'MM/dd');
         dayLabels.push(label);
 
-        const s = executions.filter(e => startOfDay(e.startedAt).getTime() === day.getTime() && e.status === 'SUCCESS').length;
-        const f = executions.filter(e => startOfDay(e.startedAt).getTime() === day.getTime() && e.status === 'FAILED').length;
+        const s = executions.filter(
+          e => startOfDay(e.startedAt).getTime() === day.getTime() && e.status === 'SUCCESS',
+        ).length;
+        const f = executions.filter(
+          e => startOfDay(e.startedAt).getTime() === day.getTime() && e.status === 'FAILED',
+        ).length;
 
         successByDay.push(s);
         failedByDay.push(f);
         totalByDay.push(s + f);
       }
 
-      // 3. Per-workflow stats — use groupBy by workflowId only (safe scalar)
       const workflowStats = await prisma.execution.groupBy({
         by: ['workflowId'],
         where: {
-          workflow: { userId },
+          workspaceId,
           startedAt: { gte: since },
         },
         _count: true,
@@ -159,7 +320,7 @@ export const executionsRouter = createTRPCRouter({
         prisma.execution.groupBy({
           by: ['workflowId'],
           where: {
-            workflow: { userId },
+            workspaceId,
             status: 'SUCCESS',
             startedAt: { gte: since },
           },
@@ -168,7 +329,7 @@ export const executionsRouter = createTRPCRouter({
         prisma.execution.groupBy({
           by: ['workflowId'],
           where: {
-            workflow: { userId },
+            workspaceId,
             status: 'FAILED',
             startedAt: { gte: since },
           },
