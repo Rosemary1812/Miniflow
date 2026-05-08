@@ -1,19 +1,35 @@
 import type { Metadata } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
+import localFont from 'next/font/local';
 import './globals.css';
 import { TRPCReactProvider } from './trpc/client';
 import { Toaster } from 'sonner';
 import { NuqsAdapter } from 'nuqs/adapters/next/app';
 import { Provider } from 'jotai';
 
-const geistSans = Geist({
+// Use bundled local font files so production builds do not depend on Google Fonts.
+const geistSans = localFont({
+  src: [
+    {
+      path: '../../node_modules/next/dist/esm/next-devtools/server/font/geist-latin.woff2',
+      weight: '400',
+      style: 'normal',
+    },
+  ],
   variable: '--font-geist-sans',
-  subsets: ['latin'],
+  display: 'swap',
 });
 
-const geistMono = Geist_Mono({
+// Use bundled local mono font files for the same offline build path.
+const geistMono = localFont({
+  src: [
+    {
+      path: '../../node_modules/next/dist/esm/next-devtools/server/font/geist-mono-latin.woff2',
+      weight: '400',
+      style: 'normal',
+    },
+  ],
   variable: '--font-geist-mono',
-  subsets: ['latin'],
+  display: 'swap',
 });
 
 export const metadata: Metadata = {
