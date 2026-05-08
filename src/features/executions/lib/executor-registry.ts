@@ -11,6 +11,8 @@ import { discordExecutor } from '../components/discord/executor';
 import { slackExecutor } from '../components/slack/executor';
 import { ifBranchExecutor } from '../components/if-branch/executor';
 import { scheduleTriggerExecutor } from '@/features/triggers/components/schedule-trigger/executor';
+import { mcpToolExecutor } from '../components/mcp-tool/executor';
+import { knowledgeRetrievalExecutor } from '../components/knowledge-retrieval/executor';
 
 export const executorRegistry: Record<NodeType, NodeExecutor> = {
   [NodeType.MANUAL_TRIGGER]: manualTriggerExecutor,
@@ -25,6 +27,8 @@ export const executorRegistry: Record<NodeType, NodeExecutor> = {
   [NodeType.DISCORD]: discordExecutor,
   [NodeType.IF_BRANCH]: ifBranchExecutor,
   [NodeType.SCHEDULE_TRIGGER]: scheduleTriggerExecutor,
+  [NodeType.MCP_TOOL]: mcpToolExecutor,
+  [NodeType.KNOWLEDGE_RETRIEVAL]: knowledgeRetrievalExecutor,
 };
 export const getExecutor = (type: NodeType): NodeExecutor => {
   const executor = executorRegistry[type];

@@ -2,7 +2,14 @@
 
 import { createId } from '@paralleldrive/cuid2';
 import { useReactFlow } from '@xyflow/react';
-import { GlobeIcon, MousePointerIcon, WebhookIcon, GitBranchIcon, ClockIcon } from 'lucide-react';
+import {
+  GlobeIcon,
+  MousePointerIcon,
+  GitBranchIcon,
+  ClockIcon,
+  PlugIcon,
+  SearchIcon,
+} from 'lucide-react';
 
 import { useCallback } from 'react';
 import { toast } from 'sonner';
@@ -62,6 +69,18 @@ const excutionNodes: NodeTypeOption[] = [
     label: 'HTTP Request',
     description: 'Makes an HTTP request',
     icon: GlobeIcon,
+  },
+  {
+    type: NodeType.MCP_TOOL,
+    label: 'MCP Tool',
+    description: 'Call a tool from a remote MCP server.',
+    icon: PlugIcon,
+  },
+  {
+    type: NodeType.KNOWLEDGE_RETRIEVAL,
+    label: 'Knowledge Retrieval',
+    description: 'Retrieve chunks from workspace knowledge bases.',
+    icon: SearchIcon,
   },
 
   {

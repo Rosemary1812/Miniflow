@@ -21,7 +21,8 @@ export const PromptTemplateEditor = ({ label, value, placeholder, onChange }: Pr
         onChange={event => onChange(event.target.value)}
       />
       <p className="text-xs text-muted-foreground">
-        Use template variables like {'{{httpResponse.data}}'} or {'{{json items}}'}.
+        Use template variables like {'{{httpResponse.data}}'}, {'{{json items}}'}, or{' '}
+        {'{{json knowledge.result}}'}.
       </p>
     </div>
   );

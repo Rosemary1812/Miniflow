@@ -6,6 +6,7 @@ A self-hosted workflow automation platform built with Next.js 15, inspired by n8
 
 - **Visual Workflow Editor** — Drag-and-drop node-based workflow design powered by @xyflow/react
 - **AI Integration** — Gemini, OpenAI, and Anthropic nodes with prompt templating via Handlebars
+- **MCP Tooling** — Connect remote MCP servers and call synced tools from workflows
 - **Conditional Branching** — If/Else nodes with customizable conditions
 - **Scheduled Triggers** — Cron-based workflow scheduling via Inngest
 - **Execution History** — Track every workflow run with status, duration, and error details
@@ -15,16 +16,16 @@ A self-hosted workflow automation platform built with Next.js 15, inspired by n8
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|-----------|
-| Framework | Next.js 15 (App Router, Turbopack) |
-| Database | PostgreSQL + Prisma ORM |
-| Auth | Better Auth |
-| API | tRPC (end-to-end typesafe) |
-| AI SDK | Vercel AI SDK |
-| Task Queue | Inngest |
-| UI | shadcn/ui + Tailwind CSS |
-| Charts | Recharts |
+| Layer      | Technology                         |
+| ---------- | ---------------------------------- |
+| Framework  | Next.js 15 (App Router, Turbopack) |
+| Database   | PostgreSQL + Prisma ORM            |
+| Auth       | Better Auth                        |
+| API        | tRPC (end-to-end typesafe)         |
+| AI SDK     | Vercel AI SDK                      |
+| Task Queue | Inngest                            |
+| UI         | shadcn/ui + Tailwind CSS           |
+| Charts     | Recharts                           |
 
 ## Getting Started
 
@@ -69,34 +70,42 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 Copy `.env.example` to `.env` and configure the following:
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `DATABASE_URL` | Yes | PostgreSQL connection string |
-| `BETTER_AUTH_SECRET` | Yes | Auth secret (generate with `openssl rand -hex 32`) |
-| `BETTER_AUTH_URL` | Yes | Base URL of your app (e.g. `http://localhost:3000`) |
-| `GOOGLE_GENERATIVE_AI_API_KEY` | Recommended | For Gemini AI node |
-| `OPENAI_API_KEY` | Recommended | For OpenAI node |
-| `ANTHROPIC_API_KEY` | Recommended | For Anthropic node |
-| `CREDENTIAL_ENCRYPTION_KEY` | Yes | 32-byte hex key for encrypting stored API keys |
+| Variable                       | Required    | Description                                         |
+| ------------------------------ | ----------- | --------------------------------------------------- |
+| `DATABASE_URL`                 | Yes         | PostgreSQL connection string                        |
+| `BETTER_AUTH_SECRET`           | Yes         | Auth secret (generate with `openssl rand -hex 32`)  |
+| `BETTER_AUTH_URL`              | Yes         | Base URL of your app (e.g. `http://localhost:3000`) |
+| `GOOGLE_GENERATIVE_AI_API_KEY` | Recommended | For Gemini AI node                                  |
+| `OPENAI_API_KEY`               | Recommended | For OpenAI node                                     |
+| `ANTHROPIC_API_KEY`            | Recommended | For Anthropic node                                  |
+| `CREDENTIAL_ENCRYPTION_KEY`    | Yes         | 32-byte hex key for encrypting stored API keys      |
 
 Generate the encryption key with:
+
 ```bash
 openssl rand -hex 32
 ```
 
 ## Supported Node Types
 
-| Node | Description |
-|------|-------------|
-| Manual Trigger | Start a workflow manually |
-| Schedule Trigger | Run on a cron schedule |
-| HTTP Request | Fetch data from any API |
-| Gemini | Google AI text generation |
-| OpenAI | GPT text generation (supports custom baseURL, e.g. Groq) |
-| Anthropic | Claude text generation (supports custom baseURL) |
-| Discord | Send messages to Discord via webhook |
-| Slack | Send messages to Slack via webhook |
-| If / Else | Conditional branching |
+| Node             | Description                                              |
+| ---------------- | -------------------------------------------------------- |
+| Manual Trigger   | Start a workflow manually                                |
+| Schedule Trigger | Run on a cron schedule                                   |
+| HTTP Request     | Fetch data from any API                                  |
+| MCP Tool         | Call a synced tool from a remote MCP server              |
+| Gemini           | Google AI text generation                                |
+| OpenAI           | GPT text generation (supports custom baseURL, e.g. Groq) |
+| Anthropic        | Claude text generation (supports custom baseURL)         |
+| Discord          | Send messages to Discord via webhook                     |
+| Slack            | Send messages to Slack via webhook                       |
+| If / Else        | Conditional branching                                    |
+
+## MCP Servers
+
+MiniFlow can act as an MCP host/client. Add remote Streamable HTTP MCP servers from **MCP Servers**, sync their tool list, then add an **MCP Tool** node in the workflow editor.
+
+The first version supports remote HTTP MCP servers only. Local `stdio` servers and arbitrary command execution are intentionally not supported.
 
 ## Architecture
 

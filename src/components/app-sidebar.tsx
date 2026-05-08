@@ -3,11 +3,13 @@
 import {
   BarChart3Icon,
   CreditCardIcon,
+  DatabaseIcon,
   FileTextIcon,
   FolderOpenIcon,
   HistoryIcon,
   KeyIcon,
   LogOutIcon,
+  PlugIcon,
   StarIcon,
   UsersIcon,
 } from 'lucide-react';
@@ -42,6 +44,16 @@ const menuItems = [
         title: 'Credentials',
         icon: KeyIcon,
         href: '/credentials',
+      },
+      {
+        title: 'Knowledge',
+        icon: DatabaseIcon,
+        href: '/knowledge',
+      },
+      {
+        title: 'MCP Servers',
+        icon: PlugIcon,
+        href: '/mcp',
       },
       {
         title: 'Executions',

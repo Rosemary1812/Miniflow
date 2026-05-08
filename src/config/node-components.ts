@@ -12,6 +12,8 @@ import { DiscordNode } from '@/features/executions/components/discord/node';
 import { SlackNode } from '@/features/executions/components/slack/node';
 import { IfBranchNode } from '@/features/executions/components/if-branch/node';
 import { ScheduleTriggerNode } from '@/features/triggers/components/schedule-trigger/node';
+import { McpToolNode } from '@/features/executions/components/mcp-tool/node';
+import { KnowledgeRetrievalNode } from '@/features/executions/components/knowledge-retrieval/node';
 
 export const nodeComponents = {
   [NodeType.INITIAL]: InitialNode,
@@ -26,6 +28,8 @@ export const nodeComponents = {
   [NodeType.SLACK]: SlackNode,
   [NodeType.IF_BRANCH]: IfBranchNode,
   [NodeType.SCHEDULE_TRIGGER]: ScheduleTriggerNode,
+  [NodeType.MCP_TOOL]: McpToolNode,
+  [NodeType.KNOWLEDGE_RETRIEVAL]: KnowledgeRetrievalNode,
 } as const satisfies NodeTypes;
 
 export type RegisteredNodeType = keyof typeof nodeComponents;

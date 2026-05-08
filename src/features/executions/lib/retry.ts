@@ -10,6 +10,7 @@ const retryableNodeTypes = new Set<NodeType>([
   NodeType.SLACK,
   NodeType.GOOGLE_FORM_TRIGGER,
   NodeType.STRIPE_TRIGGER,
+  NodeType.MCP_TOOL,
 ]);
 
 export type RetryConfig = {

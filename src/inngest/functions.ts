@@ -36,6 +36,9 @@ import { discordChannel } from './channels/discord';
 import { slackChannel } from './channels/slack';
 import { ifBranchChannel } from './channels/if-branch';
 import { scheduleTriggerChannel } from './channels/schedule-trigger';
+import { mcpToolChannel } from './channels/mcp-tool';
+import { knowledgeRetrievalChannel } from './channels/knowledge-retrieval';
+import { processKnowledgeDocument } from '@/features/knowledge/lib/process-document';
 
 /**
  * Build a map: nodeId -> list of controlling IF_BRANCH paths.
@@ -176,6 +179,8 @@ export const executeWorkflow = inngest.createFunction(
       slackChannel(),
       ifBranchChannel(),
       scheduleTriggerChannel(),
+      mcpToolChannel(),
+      knowledgeRetrievalChannel(),
     ],
   },
   async ({ event, step, publish }) => {
@@ -400,6 +405,26 @@ export const executeWorkflow = inngest.createFunction(
       workflowId,
       result: context,
     };
+  },
+);
+
+export const processKnowledgeDocumentFunction = inngest.createFunction(
+  {
+    id: 'process-knowledge-document',
+    retries: 1,
+  },
+  { event: 'knowledge/process-document' },
+  async ({ event, step }) => {
+    const documentId = event.data.documentId;
+    if (!documentId) {
+      throw new NonRetriableError('Knowledge document ID is missing');
+    }
+
+    await step.run('process-document', async () => {
+      await processKnowledgeDocument(documentId);
+    });
+
+    return { documentId };
   },
 );
 

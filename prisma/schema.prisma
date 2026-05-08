@@ -27,6 +27,7 @@ model User {
   workspaceInvitesCreated WorkspaceInvite[]    @relation("WorkspaceInviteCreator")
   workflowVersionsCreated WorkflowVersion[]    @relation("WorkflowVersionCreator")
   workflowPublishLogs     WorkflowPublishLog[] @relation("WorkflowPublisher")
+  mcpServersCreated       McpServer[]          @relation("McpServerCreator")
 
   @@map("user")
 }
@@ -154,6 +155,33 @@ enum NodeType {
   SLACK
   IF_BRANCH
   SCHEDULE_TRIGGER
+  MCP_TOOL
+  KNOWLEDGE_RETRIEVAL
+}
+
+enum KnowledgeDocumentStatus {
+  PENDING
+  PROCESSING
+  READY
+  FAILED
+}
+
+enum KnowledgeSourceType {
+  TEXT
+}
+
+enum EmbeddingProvider {
+  OPENAI
+}
+
+enum McpTransport {
+  STREAMABLE_HTTP
+}
+
+enum McpAuthType {
+  NONE
+  BEARER
+  HEADER
 }
 
 model ScheduledWorkflow {
@@ -259,10 +287,110 @@ model Workspace {
   credentials        Credential[]
   executions         Execution[]
   scheduledWorkflows ScheduledWorkflow[]
+  mcpServers         McpServer[]
+  knowledgeBases     KnowledgeBase[]
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
 
   @@index([ownerId])
+}
+
+model KnowledgeBase {
+  id          String              @id @default(cuid())
+  workspaceId String
+  workspace   Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name        String
+  description String?             @db.Text
+  documents   KnowledgeDocument[]
+  chunks      KnowledgeChunk[]
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@index([workspaceId])
+}
+
+model KnowledgeDocument {
+  id              String                  @id @default(cuid())
+  workspaceId     String
+  knowledgeBaseId String
+  knowledgeBase   KnowledgeBase           @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+  title           String
+  sourceType      KnowledgeSourceType     @default(TEXT)
+  sourceText      String                  @db.Text
+  status          KnowledgeDocumentStatus @default(PENDING)
+  error           String?                 @db.Text
+  chunkCount      Int                     @default(0)
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+  processedAt     DateTime?
+  chunks          KnowledgeChunk[]
+
+  @@index([workspaceId])
+  @@index([knowledgeBaseId])
+  @@index([status])
+}
+
+model KnowledgeChunk {
+  id                String                @id @default(cuid())
+  workspaceId       String
+  knowledgeBaseId   String
+  knowledgeBase     KnowledgeBase         @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+  documentId        String
+  document          KnowledgeDocument     @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  index             Int
+  content           String                @db.Text
+  tokenCount        Int                   @default(0)
+  metadata          Json?
+  embedding         Unsupported("vector")
+  embeddingModel    String                @default("text-embedding-3-small")
+  embeddingProvider EmbeddingProvider     @default(OPENAI)
+  createdAt         DateTime              @default(now())
+
+  @@unique([documentId, index])
+  @@index([workspaceId])
+  @@index([knowledgeBaseId])
+  @@index([documentId])
+}
+
+model McpServer {
+  id              String         @id @default(cuid())
+  workspaceId     String
+  workspace       Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name            String
+  transport       McpTransport   @default(STREAMABLE_HTTP)
+  url             String
+  authType        McpAuthType    @default(NONE)
+  encryptedSecret String?
+  iv              String?
+  authHeaderName  String?
+  enabled         Boolean        @default(true)
+  lastCheckedAt   DateTime?
+  lastError       String?        @db.Text
+  createdBy       String
+  creator         User           @relation("McpServerCreator", fields: [createdBy], references: [id], onDelete: Cascade)
+  tools           McpToolCache[]
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([workspaceId])
+  @@index([createdBy])
+}
+
+model McpToolCache {
+  id           String    @id @default(cuid())
+  workspaceId  String
+  mcpServerId  String
+  mcpServer    McpServer @relation(fields: [mcpServerId], references: [id], onDelete: Cascade)
+  name         String
+  description  String?   @db.Text
+  inputSchema  Json?
+  lastSyncedAt DateTime
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([mcpServerId, name])
+  @@index([workspaceId])
+  @@index([mcpServerId])
 }
 
 model WorkspaceMember {

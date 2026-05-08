@@ -28,6 +28,8 @@ const NODE_TYPE_LABELS: Record<NodeType, string> = {
   SLACK: 'Slack',
   IF_BRANCH: 'If / Else',
   SCHEDULE_TRIGGER: 'Schedule',
+  MCP_TOOL: 'MCP Tool',
+  KNOWLEDGE_RETRIEVAL: 'Knowledge Retrieval',
 };
 
 export const templateRouter = createTRPCRouter({
