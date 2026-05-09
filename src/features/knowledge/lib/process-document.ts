@@ -1,11 +1,11 @@
 import { createId } from '@paralleldrive/cuid2';
 import { EmbeddingProvider, KnowledgeDocumentStatus } from '@prisma/client';
 import prisma from '@/lib/db';
-import { chunkText } from './chunking';
 import { embedKnowledgeTexts, KNOWLEDGE_EMBEDDING_MODEL } from './embeddings';
+import { parseKnowledgeDocument } from './document-parsers';
 
 const toVectorLiteral = (embedding: number[]): string => {
-  return `[${embedding.map(value => Number(value).toString()).join(',')}]`;
+  return `[${embedding.map(value => value.toString()).join(',')}]`;
 };
 
 export const processKnowledgeDocument = async (documentId: string) => {
@@ -28,7 +28,12 @@ export const processKnowledgeDocument = async (documentId: string) => {
   });
 
   try {
-    const chunks = chunkText(document.sourceText);
+    const parsedDocument = await parseKnowledgeDocument({
+      sourceType: document.sourceType,
+      sourceText: document.sourceText,
+      sourceData: document.sourceData,
+    });
+    const chunks = parsedDocument.chunks;
     if (chunks.length === 0) {
       throw new Error('Document text is empty after cleaning');
     }
@@ -68,6 +73,7 @@ export const processKnowledgeDocument = async (documentId: string) => {
       await tx.knowledgeDocument.update({
         where: { id: document.id },
         data: {
+          sourceText: parsedDocument.text,
           status: KnowledgeDocumentStatus.READY,
           chunkCount: chunks.length,
           error: null,

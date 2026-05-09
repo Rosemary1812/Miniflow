@@ -50,7 +50,9 @@ export const KnowledgeDocumentPage = ({
           <Button
             variant="outline"
             disabled={reprocess.isPending}
-            onClick={() => reprocess.mutate({ id: documentId })}
+            onClick={() => {
+              reprocess.mutate({ id: documentId });
+            }}
           >
             Reprocess
           </Button>
@@ -61,7 +63,15 @@ export const KnowledgeDocumentPage = ({
         {chunks.data?.map(chunk => (
           <div key={chunk.id} className="rounded-md border p-4">
             <div className="mb-2 flex items-center justify-between gap-2">
-              <Badge variant="outline">Chunk {chunk.index + 1}</Badge>
+              <div className="flex items-center gap-2">
+                <Badge variant="outline">Chunk {chunk.index + 1}</Badge>
+                {typeof chunk.metadata === 'object' &&
+                chunk.metadata &&
+                'page' in chunk.metadata &&
+                typeof chunk.metadata.page === 'number' ? (
+                  <Badge variant="secondary">Page {chunk.metadata.page}</Badge>
+                ) : null}
+              </div>
               <span className="text-xs text-muted-foreground">{chunk.tokenCount} tokens</span>
             </div>
             <p className="whitespace-pre-wrap text-sm">{chunk.content}</p>

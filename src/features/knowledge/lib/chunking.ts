@@ -5,6 +5,9 @@ export type TextChunk = {
   metadata: {
     start: number;
     end: number;
+    page?: number;
+    section?: string;
+    sourceType?: string;
   };
 };
 
@@ -26,7 +29,11 @@ export const estimateTokenCount = (text: string): number => {
 
 export const chunkText = (
   input: string,
-  options: { chunkSize?: number; chunkOverlap?: number } = {},
+  options: {
+    chunkSize?: number;
+    chunkOverlap?: number;
+    metadata?: Omit<TextChunk['metadata'], 'start' | 'end'>;
+  } = {},
 ): TextChunk[] => {
   const text = cleanKnowledgeText(input);
   const chunkSize = options.chunkSize ?? DEFAULT_CHUNK_SIZE;
@@ -43,7 +50,11 @@ export const chunkText = (
     const targetEnd = Math.min(start + chunkSize, text.length);
     const window = text.slice(start, targetEnd);
     const paragraphBreak = window.lastIndexOf('\n\n');
-    const sentenceBreak = Math.max(window.lastIndexOf('. '), window.lastIndexOf('? '), window.lastIndexOf('! '));
+    const sentenceBreak = Math.max(
+      window.lastIndexOf('. '),
+      window.lastIndexOf('? '),
+      window.lastIndexOf('! '),
+    );
     const breakAt =
       targetEnd === text.length
         ? window.length
@@ -60,7 +71,7 @@ export const chunkText = (
         index: chunks.length,
         content,
         tokenCount: estimateTokenCount(content),
-        metadata: { start, end },
+        metadata: { ...options.metadata, start, end },
       });
     }
 

@@ -34,7 +34,7 @@ export const useCreateKnowledgeBase = () => {
     trpc.knowledgeBases.create.mutationOptions({
       onSuccess: data => {
         toast.success(`Knowledge base "${data.name}" created`);
-        queryClient.invalidateQueries(trpc.knowledgeBases.list.queryFilter());
+        void queryClient.invalidateQueries(trpc.knowledgeBases.list.queryFilter());
       },
       onError: error => toast.error(`Failed to create knowledge base: ${error.message}`),
     }),
@@ -48,7 +48,7 @@ export const useRemoveKnowledgeBase = () => {
     trpc.knowledgeBases.remove.mutationOptions({
       onSuccess: data => {
         toast.success(`Knowledge base "${data.name}" removed`);
-        queryClient.invalidateQueries(trpc.knowledgeBases.list.queryFilter());
+        void queryClient.invalidateQueries(trpc.knowledgeBases.list.queryFilter());
       },
       onError: error => toast.error(`Failed to remove knowledge base: ${error.message}`),
     }),
@@ -62,10 +62,31 @@ export const useCreateTextDocument = (knowledgeBaseId: string) => {
     trpc.knowledgeDocuments.createText.mutationOptions({
       onSuccess: data => {
         toast.success(`Document "${data.title}" queued`);
-        queryClient.invalidateQueries(
+        void queryClient.invalidateQueries(
           trpc.knowledgeDocuments.list.queryOptions({ knowledgeBaseId }),
         );
-        queryClient.invalidateQueries(trpc.knowledgeBases.getOne.queryOptions({ id: knowledgeBaseId }));
+        void queryClient.invalidateQueries(
+          trpc.knowledgeBases.getOne.queryOptions({ id: knowledgeBaseId }),
+        );
+      },
+      onError: error => toast.error(`Failed to import document: ${error.message}`),
+    }),
+  );
+};
+
+export const useCreateKnowledgeDocument = (knowledgeBaseId: string) => {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  return useMutation(
+    trpc.knowledgeDocuments.create.mutationOptions({
+      onSuccess: data => {
+        toast.success(`Document "${data.title}" queued`);
+        void queryClient.invalidateQueries(
+          trpc.knowledgeDocuments.list.queryOptions({ knowledgeBaseId }),
+        );
+        void queryClient.invalidateQueries(
+          trpc.knowledgeBases.getOne.queryOptions({ id: knowledgeBaseId }),
+        );
       },
       onError: error => toast.error(`Failed to import document: ${error.message}`),
     }),
@@ -79,7 +100,7 @@ export const useRemoveKnowledgeDocument = (knowledgeBaseId: string) => {
     trpc.knowledgeDocuments.remove.mutationOptions({
       onSuccess: data => {
         toast.success(`Document "${data.title}" removed`);
-        queryClient.invalidateQueries(
+        void queryClient.invalidateQueries(
           trpc.knowledgeDocuments.list.queryOptions({ knowledgeBaseId }),
         );
       },
@@ -95,12 +116,14 @@ export const useReprocessKnowledgeDocument = (knowledgeBaseId: string, documentI
     trpc.knowledgeDocuments.reprocess.mutationOptions({
       onSuccess: data => {
         toast.success('Document reprocessing queued');
-        queryClient.invalidateQueries(
+        void queryClient.invalidateQueries(
           trpc.knowledgeDocuments.list.queryOptions({ knowledgeBaseId }),
         );
-        queryClient.invalidateQueries(trpc.knowledgeDocuments.getOne.queryOptions({ id: data.id }));
+        void queryClient.invalidateQueries(
+          trpc.knowledgeDocuments.getOne.queryOptions({ id: data.id }),
+        );
         if (documentId) {
-          queryClient.invalidateQueries(
+          void queryClient.invalidateQueries(
             trpc.knowledgeChunks.listByDocument.queryOptions({ documentId }),
           );
         }

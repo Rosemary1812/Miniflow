@@ -15,6 +15,13 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import {
   EmptyView,
@@ -25,20 +32,34 @@ import {
   LoadingView,
 } from '@/components/entity-components';
 import {
-  useCreateTextDocument,
+  useCreateKnowledgeDocument,
   useKnowledgeDocuments,
   useRemoveKnowledgeDocument,
   useSuspenseKnowledgeBase,
   useTestKnowledgeRetrieval,
 } from '../hooks/use-knowledge';
 
+type ImportSourceType = 'TEXT' | 'MARKDOWN' | 'PDF';
+
+const fileToBase64 = async (file: File): Promise<string> => {
+  const buffer = await file.arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+  return btoa(binary);
+};
+
 export const KnowledgeBaseDetailPage = ({ knowledgeBaseId }: { knowledgeBaseId: string }) => {
   const base = useSuspenseKnowledgeBase(knowledgeBaseId);
   const documents = useKnowledgeDocuments(knowledgeBaseId);
   const [open, setOpen] = useState(false);
+  const [sourceType, setSourceType] = useState<ImportSourceType>('TEXT');
   const [title, setTitle] = useState('');
   const [text, setText] = useState('');
-  const createDocument = useCreateTextDocument(knowledgeBaseId);
+  const [file, setFile] = useState<File | null>(null);
+  const createDocument = useCreateKnowledgeDocument(knowledgeBaseId);
 
   if (documents.isLoading) {
     return <LoadingView message="Loading documents..." />;
@@ -47,18 +68,33 @@ export const KnowledgeBaseDetailPage = ({ knowledgeBaseId }: { knowledgeBaseId: 
     return <ErrorView message="Error loading documents..." />;
   }
 
-  const handleCreateDocument = () => {
+  const resetImportForm = () => {
+    setOpen(false);
+    setSourceType('TEXT');
+    setTitle('');
+    setText('');
+    setFile(null);
+  };
+
+  const handleCreateDocument = async () => {
+    const sourceData = file ? await fileToBase64(file) : undefined;
     createDocument.mutate(
-      { knowledgeBaseId, title, text },
       {
-        onSuccess: () => {
-          setOpen(false);
-          setTitle('');
-          setText('');
-        },
+        knowledgeBaseId,
+        title,
+        sourceType,
+        text: sourceType === 'PDF' ? undefined : text,
+        sourceData,
+        originalName: file?.name,
+        mimeType: file?.type,
+      },
+      {
+        onSuccess: resetImportForm,
       },
     );
   };
+
+  const hasImportContent = sourceType === 'PDF' ? Boolean(file) : Boolean(text.trim());
 
   return (
     <EntityContainer
@@ -69,7 +105,9 @@ export const KnowledgeBaseDetailPage = ({ knowledgeBaseId }: { knowledgeBaseId: 
               <Link href="/knowledge">Knowledge</Link>
             </div>
             <h1 className="text-xl font-semibold">{base.data.name}</h1>
-            <p className="text-sm text-muted-foreground">{base.data.description || 'No description'}</p>
+            <p className="text-sm text-muted-foreground">
+              {base.data.description || 'No description'}
+            </p>
             <div className="flex gap-2">
               <Badge variant="outline">{base.data.documentCount} docs</Badge>
               <Badge variant="secondary">{base.data.chunkCount} chunks</Badge>
@@ -77,30 +115,70 @@ export const KnowledgeBaseDetailPage = ({ knowledgeBaseId }: { knowledgeBaseId: 
           </div>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-              <Button>Import Text</Button>
+              <Button>Import Document</Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-2xl">
               <DialogHeader>
-                <DialogTitle>Import Text Document</DialogTitle>
+                <DialogTitle>Import Document</DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Title</Label>
-                  <Input value={title} onChange={event => setTitle(event.target.value)} />
+                  <Label>Source type</Label>
+                  <Select
+                    value={sourceType}
+                    onValueChange={value => {
+                      setSourceType(value as ImportSourceType);
+                      setText('');
+                      setFile(null);
+                    }}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="TEXT">Text</SelectItem>
+                      <SelectItem value="MARKDOWN">Markdown</SelectItem>
+                      <SelectItem value="PDF">PDF</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Text</Label>
-                  <Textarea
-                    value={text}
-                    onChange={event => setText(event.target.value)}
-                    className="min-h-[260px] font-mono text-sm"
+                  <Label>Title</Label>
+                  <Input
+                    value={title}
+                    onChange={event => {
+                      setTitle(event.target.value);
+                    }}
                   />
                 </div>
+                {sourceType === 'PDF' ? (
+                  <div className="space-y-2">
+                    <Label>PDF file</Label>
+                    <Input
+                      type="file"
+                      accept="application/pdf,.pdf"
+                      onChange={event => {
+                        setFile(event.target.files?.[0] || null);
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Label>{sourceType === 'MARKDOWN' ? 'Markdown' : 'Text'}</Label>
+                    <Textarea
+                      value={text}
+                      onChange={event => {
+                        setText(event.target.value);
+                      }}
+                      className="min-h-[260px] font-mono text-sm"
+                    />
+                  </div>
+                )}
               </div>
               <DialogFooter>
                 <Button
-                  disabled={!title || !text || createDocument.isPending}
-                  onClick={handleCreateDocument}
+                  disabled={!title || !hasImportContent || createDocument.isPending}
+                  onClick={() => void handleCreateDocument()}
                 >
                   Import
                 </Button>
@@ -144,6 +222,14 @@ const KnowledgeDocumentItem = ({
         <div className="flex flex-wrap items-center gap-2">
           <span>{document.chunkCount} chunks</span>
           <span>&bull;</span>
+          <span>{document.sourceType}</span>
+          {document.originalName ? (
+            <>
+              <span>&bull;</span>
+              <span>{document.originalName}</span>
+            </>
+          ) : null}
+          <span>&bull;</span>
           <span>Updated {formatDistanceToNow(document.updatedAt, { addSuffix: true })}</span>
           {document.error ? (
             <>
@@ -153,8 +239,14 @@ const KnowledgeDocumentItem = ({
           ) : null}
         </div>
       }
-      actions={<Badge variant={document.status === 'READY' ? 'default' : 'secondary'}>{document.status}</Badge>}
-      onRemove={() => removeDocument.mutate({ id: document.id })}
+      actions={
+        <Badge variant={document.status === 'READY' ? 'default' : 'secondary'}>
+          {document.status}
+        </Badge>
+      }
+      onRemove={() => {
+        removeDocument.mutate({ id: document.id });
+      }}
       isRemoving={removeDocument.isPending}
     />
   );
@@ -169,20 +261,22 @@ const RetrievalTestPanel = ({ knowledgeBaseId }: { knowledgeBaseId: string }) =>
       <div className="grid gap-3 md:grid-cols-[1fr_auto]">
         <Input
           value={query}
-          onChange={event => setQuery(event.target.value)}
+          onChange={event => {
+            setQuery(event.target.value);
+          }}
           placeholder="Test retrieval query"
         />
         <Button
           variant="outline"
           disabled={!query || retrieval.isPending}
-          onClick={() =>
+          onClick={() => {
             retrieval.mutate({
               knowledgeBaseIds: [knowledgeBaseId],
               query,
               topK: 5,
               scoreThreshold: 0.25,
-            })
-          }
+            });
+          }}
         >
           Test Retrieval
         </Button>
@@ -193,7 +287,11 @@ const RetrievalTestPanel = ({ knowledgeBaseId }: { knowledgeBaseId: string }) =>
             <div key={result.chunkId} className="rounded-md bg-muted p-3 text-sm">
               <div className="mb-1 flex items-center justify-between gap-2">
                 <span className="font-medium">{result.title}</span>
-                <Badge variant="outline">{result.score.toFixed(3)}</Badge>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline">score {result.score.toFixed(3)}</Badge>
+                  <Badge variant="secondary">vector {result.vectorScore.toFixed(3)}</Badge>
+                  <Badge variant="secondary">keyword {result.keywordScore.toFixed(3)}</Badge>
+                </div>
               </div>
               <p className="whitespace-pre-wrap text-muted-foreground">{result.content}</p>
             </div>

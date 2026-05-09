@@ -2,12 +2,22 @@ import { createTRPCRouter, protectedProcedure } from '@/app/trpc/init';
 import prisma from '@/lib/db';
 import { requireWorkspaceRole } from '@/lib/workspace';
 import { inngest } from '@/inngest/client';
-import { KnowledgeDocumentStatus, WorkspaceRole } from '@prisma/client';
+import { KnowledgeDocumentStatus, KnowledgeSourceType, WorkspaceRole } from '@prisma/client';
 import { TRPCError } from '@trpc/server';
 import z from 'zod';
 import { retrieveKnowledge } from '../lib/retrieval';
 
 const variableNameSchema = z.string().regex(/^[A-Za-z_$][A-Za-z0-9_$]*$/);
+const knowledgeSourceTypeSchema = z.enum(KnowledgeSourceType);
+const importDocumentSchema = z.object({
+  knowledgeBaseId: z.string(),
+  title: z.string().min(1),
+  sourceType: knowledgeSourceTypeSchema.default(KnowledgeSourceType.TEXT),
+  text: z.string().optional(),
+  sourceData: z.string().optional(),
+  originalName: z.string().optional(),
+  mimeType: z.string().optional(),
+});
 
 const assertKnowledgeBaseAccess = async ({
   userId,
@@ -110,7 +120,9 @@ export const knowledgeBasesRouter = createTRPCRouter({
   }),
 
   update: protectedProcedure
-    .input(z.object({ id: z.string(), name: z.string().min(1), description: z.string().optional() }))
+    .input(
+      z.object({ id: z.string(), name: z.string().min(1), description: z.string().optional() }),
+    )
     .mutation(async ({ ctx, input }) => {
       const knowledgeBase = await assertKnowledgeBaseAccess({
         userId: ctx.auth.user.id,
@@ -127,18 +139,58 @@ export const knowledgeBasesRouter = createTRPCRouter({
       });
     }),
 
-  remove: protectedProcedure.input(z.object({ id: z.string() })).mutation(async ({ ctx, input }) => {
-    const knowledgeBase = await assertKnowledgeBaseAccess({
-      userId: ctx.auth.user.id,
-      knowledgeBaseId: input.id,
-      minRole: WorkspaceRole.OWNER,
-    });
+  remove: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const knowledgeBase = await assertKnowledgeBaseAccess({
+        userId: ctx.auth.user.id,
+        knowledgeBaseId: input.id,
+        minRole: WorkspaceRole.OWNER,
+      });
 
-    return prisma.knowledgeBase.delete({ where: { id: knowledgeBase.id } });
-  }),
+      return prisma.knowledgeBase.delete({ where: { id: knowledgeBase.id } });
+    }),
 });
 
 export const knowledgeDocumentsRouter = createTRPCRouter({
+  create: protectedProcedure.input(importDocumentSchema).mutation(async ({ ctx, input }) => {
+    const knowledgeBase = await assertKnowledgeBaseAccess({
+      userId: ctx.auth.user.id,
+      knowledgeBaseId: input.knowledgeBaseId,
+      minRole: WorkspaceRole.EDITOR,
+    });
+
+    if (input.sourceType === KnowledgeSourceType.PDF && !input.sourceData) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'PDF import requires source data',
+      });
+    }
+    if (input.sourceType !== KnowledgeSourceType.PDF && !input.text?.trim()) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Text or Markdown import requires document text',
+      });
+    }
+
+    const document = await prisma.knowledgeDocument.create({
+      data: {
+        workspaceId: knowledgeBase.workspaceId,
+        knowledgeBaseId: knowledgeBase.id,
+        title: input.title,
+        sourceType: input.sourceType,
+        sourceText: input.text || '',
+        sourceData: input.sourceData || null,
+        originalName: input.originalName || null,
+        mimeType: input.mimeType || null,
+        status: KnowledgeDocumentStatus.PENDING,
+      },
+    });
+
+    await enqueueDocumentProcessing(document.id);
+    return document;
+  }),
+
   createText: protectedProcedure
     .input(
       z.object({
@@ -159,6 +211,7 @@ export const knowledgeDocumentsRouter = createTRPCRouter({
           workspaceId: knowledgeBase.workspaceId,
           knowledgeBaseId: knowledgeBase.id,
           title: input.title,
+          sourceType: KnowledgeSourceType.TEXT,
           sourceText: input.text,
           status: KnowledgeDocumentStatus.PENDING,
         },
@@ -189,6 +242,8 @@ export const knowledgeDocumentsRouter = createTRPCRouter({
           knowledgeBaseId: true,
           title: true,
           sourceType: true,
+          originalName: true,
+          mimeType: true,
           status: true,
           error: true,
           chunkCount: true,
@@ -200,7 +255,25 @@ export const knowledgeDocumentsRouter = createTRPCRouter({
     }),
 
   getOne: protectedProcedure.input(z.object({ id: z.string() })).query(async ({ ctx, input }) => {
-    const document = await prisma.knowledgeDocument.findUniqueOrThrow({ where: { id: input.id } });
+    const document = await prisma.knowledgeDocument.findUniqueOrThrow({
+      where: { id: input.id },
+      select: {
+        id: true,
+        workspaceId: true,
+        knowledgeBaseId: true,
+        title: true,
+        sourceType: true,
+        sourceText: true,
+        originalName: true,
+        mimeType: true,
+        status: true,
+        error: true,
+        chunkCount: true,
+        createdAt: true,
+        updatedAt: true,
+        processedAt: true,
+      },
+    });
     await requireWorkspaceRole({
       userId: ctx.auth.user.id,
       workspaceId: document.workspaceId,
@@ -209,21 +282,27 @@ export const knowledgeDocumentsRouter = createTRPCRouter({
     return document;
   }),
 
-  remove: protectedProcedure.input(z.object({ id: z.string() })).mutation(async ({ ctx, input }) => {
-    const document = await prisma.knowledgeDocument.findUniqueOrThrow({ where: { id: input.id } });
-    await requireWorkspaceRole({
-      userId: ctx.auth.user.id,
-      workspaceId: document.workspaceId,
-      minRole: WorkspaceRole.EDITOR,
-    });
+  remove: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const document = await prisma.knowledgeDocument.findUniqueOrThrow({
+        where: { id: input.id },
+      });
+      await requireWorkspaceRole({
+        userId: ctx.auth.user.id,
+        workspaceId: document.workspaceId,
+        minRole: WorkspaceRole.EDITOR,
+      });
 
-    return prisma.knowledgeDocument.delete({ where: { id: document.id } });
-  }),
+      return prisma.knowledgeDocument.delete({ where: { id: document.id } });
+    }),
 
   reprocess: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      const document = await prisma.knowledgeDocument.findUniqueOrThrow({ where: { id: input.id } });
+      const document = await prisma.knowledgeDocument.findUniqueOrThrow({
+        where: { id: input.id },
+      });
       await requireWorkspaceRole({
         userId: ctx.auth.user.id,
         workspaceId: document.workspaceId,

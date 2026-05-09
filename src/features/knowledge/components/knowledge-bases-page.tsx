@@ -82,13 +82,20 @@ export const KnowledgeBasesPage = () => {
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label>Name</Label>
-                  <Input value={name} onChange={event => setName(event.target.value)} />
+                  <Input
+                    value={name}
+                    onChange={event => {
+                      setName(event.target.value);
+                    }}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>Description</Label>
                   <Textarea
                     value={description}
-                    onChange={event => setDescription(event.target.value)}
+                    onChange={event => {
+                      setDescription(event.target.value);
+                    }}
                   />
                 </div>
               </div>
@@ -102,7 +109,11 @@ export const KnowledgeBasesPage = () => {
         </div>
       }
       search={
-        <EntitySearch value={searchValue} onChange={onSearchChange} placeholder="Search knowledge" />
+        <EntitySearch
+          value={searchValue}
+          onChange={onSearchChange}
+          placeholder="Search knowledge"
+        />
       }
     >
       <EntityList
@@ -115,7 +126,9 @@ export const KnowledgeBasesPage = () => {
   );
 };
 
-type KnowledgeBaseItemData = NonNullable<ReturnType<typeof useKnowledgeBases>['data']>['items'][number];
+type KnowledgeBaseItemData = NonNullable<
+  ReturnType<typeof useKnowledgeBases>['data']
+>['items'][number];
 
 const KnowledgeBaseItem = ({ item }: { item: KnowledgeBaseItemData }) => {
   const removeBase = useRemoveKnowledgeBase();
@@ -142,7 +155,9 @@ const KnowledgeBaseItem = ({ item }: { item: KnowledgeBaseItemData }) => {
           <Badge variant="secondary">{item.chunkCount} chunks</Badge>
         </div>
       }
-      onRemove={() => removeBase.mutate({ id: item.id })}
+      onRemove={() => {
+        removeBase.mutate({ id: item.id });
+      }}
       isRemoving={removeBase.isPending}
     />
   );
