@@ -49,30 +49,33 @@ export const getAiLogFields = ({
   context: Record<string, unknown>;
   output?: Record<string, unknown>;
 }) => {
-  const aiNodeTypes = new Set<NodeType>([NodeType.OPENAI, NodeType.ANTHROPIC, NodeType.GEMINI]);
-  if (!aiNodeTypes.has(nodeType)) {
+  if (nodeType !== NodeType.AI_TEXT) {
     return {};
   }
 
-  const provider =
-    nodeType === NodeType.OPENAI
-      ? 'openai'
-      : nodeType === NodeType.ANTHROPIC
-        ? 'anthropic'
-        : 'gemini';
-  const model = typeof data.model === 'string' ? data.model : undefined;
   const systemTemplate =
     typeof data.systemPrompt === 'string' ? data.systemPrompt : 'You are a helpful assistant.';
   const userTemplate = typeof data.userPrompt === 'string' ? data.userPrompt : '';
   const variableName = typeof data.variableName === 'string' ? data.variableName : undefined;
   const responseValue = variableName ? output?.[variableName] : undefined;
-  const responseText =
-    responseValue &&
-    typeof responseValue === 'object' &&
-    'aiResponse' in responseValue &&
-    typeof responseValue.aiResponse === 'string'
-      ? responseValue.aiResponse
+  const responseObject =
+    responseValue && typeof responseValue === 'object'
+      ? (responseValue as Record<string, unknown>)
       : undefined;
+  const responseText =
+    responseObject && typeof responseObject.aiResponse === 'string'
+      ? responseObject.aiResponse
+      : undefined;
+  const provider =
+    responseObject && typeof responseObject.provider === 'string'
+      ? responseObject.provider
+      : undefined;
+  const model =
+    responseObject && typeof responseObject.model === 'string'
+      ? responseObject.model
+      : typeof data.model === 'string'
+        ? data.model
+        : undefined;
 
   return {
     provider,

@@ -41,9 +41,9 @@ const menuItems = [
         href: '/workflows',
       },
       {
-        title: 'Credentials',
+        title: 'Providers',
         icon: KeyIcon,
-        href: '/credentials',
+        href: '/providers',
       },
       {
         title: 'Knowledge',

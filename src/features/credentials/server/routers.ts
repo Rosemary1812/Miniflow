@@ -3,139 +3,140 @@ import { PAGINATION } from '@/config/constants';
 import prisma from '@/lib/db';
 import { encrypt, decrypt } from '@/lib/crypto';
 import { requireWorkspaceRole } from '@/lib/workspace';
-import { CredentialType, WorkspaceRole } from '@prisma/client';
+import { AiProviderKind, WorkspaceRole } from '@prisma/client';
 import z from 'zod';
 
-// Exclude sensitive fields from list responses
-type CredentialListItem = {
+type AiProviderListItem = {
   id: string;
   name: string;
-  type: CredentialType;
+  provider: AiProviderKind;
+  baseURL: string | null;
+  defaultModel: string | null;
+  enabled: boolean;
   createdAt: Date;
   updatedAt: Date;
   userId: string;
   workspaceId: string;
 };
 
-// For form display/edit (decrypted)
-type CredentialWithValue = {
-  id: string;
-  name: string;
-  type: CredentialType;
-  createdAt: Date;
-  updatedAt: Date;
-  userId: string;
-  workspaceId: string;
-  encryptedValue: string;
-  iv: string;
-  keyVersion: number;
-  value: string;
+type AiProviderWithApiKey = AiProviderListItem & {
+  apiKey: string;
 };
 
-export const credentialsRouter = createTRPCRouter({
-  create: protectedProcedure
-    .input(
-      z.object({
-        name: z.string().min(1, 'Name is required'),
-        workspaceId: z.string().optional(),
-        type: z.enum(CredentialType),
-        value: z.string().min(1, 'Value is required'),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      const { name, value, type } = input;
-      const workspaceId = input.workspaceId ?? ctx.workspaceId;
-      await requireWorkspaceRole({
-        userId: ctx.auth.user.id,
+const providerInput = z.object({
+  name: z.string().min(1, 'Name is required'),
+  workspaceId: z.string().optional(),
+  provider: z.enum(AiProviderKind),
+  baseURL: z.string().optional(),
+  apiKey: z.string().min(1, 'API key is required'),
+  defaultModel: z.string().optional(),
+  enabled: z.boolean().default(true),
+});
+
+export const aiProvidersRouter = createTRPCRouter({
+  create: protectedProcedure.input(providerInput).mutation(async ({ ctx, input }) => {
+    const workspaceId = input.workspaceId ?? ctx.workspaceId;
+    await requireWorkspaceRole({
+      userId: ctx.auth.user.id,
+      workspaceId,
+      minRole: WorkspaceRole.EDITOR,
+    });
+
+    const { encryptedValue, iv } = encrypt(input.apiKey);
+
+    return prisma.aiProviderProfile.create({
+      data: {
+        name: input.name,
         workspaceId,
-        minRole: WorkspaceRole.EDITOR,
-      });
-      const { encryptedValue, iv } = encrypt(value);
+        userId: ctx.auth.user.id,
+        provider: input.provider,
+        baseURL: input.baseURL || null,
+        encryptedApiKey: encryptedValue,
+        iv,
+        defaultModel: input.defaultModel || null,
+        enabled: input.enabled,
+      },
+    });
+  }),
 
-      return prisma.credential.create({
-        data: {
-          name,
-          workspaceId,
-          userId: ctx.auth.user.id,
-          type,
-          encryptedValue,
-          iv,
-        },
-      });
-    }),
   remove: protectedProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      const credential = await prisma.credential.findUniqueOrThrow({ where: { id: input.id } });
+      const profile = await prisma.aiProviderProfile.findUniqueOrThrow({ where: { id: input.id } });
       await requireWorkspaceRole({
         userId: ctx.auth.user.id,
-        workspaceId: credential.workspaceId,
+        workspaceId: profile.workspaceId,
         minRole: WorkspaceRole.OWNER,
       });
-      return prisma.credential.delete({
+
+      return prisma.aiProviderProfile.delete({
         where: {
           id: input.id,
         },
       });
     }),
+
   update: protectedProcedure
     .input(
-      z.object({
+      providerInput.extend({
         id: z.string(),
-        name: z.string().min(1, 'Name is required'),
-        type: z.enum(CredentialType),
-        value: z.string().min(1, 'Value is required'),
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const { id, name, type, value } = input;
-      const credential = await prisma.credential.findUniqueOrThrow({ where: { id } });
+      const profile = await prisma.aiProviderProfile.findUniqueOrThrow({ where: { id: input.id } });
       await requireWorkspaceRole({
         userId: ctx.auth.user.id,
-        workspaceId: credential.workspaceId,
+        workspaceId: profile.workspaceId,
         minRole: WorkspaceRole.EDITOR,
       });
-      const { encryptedValue, iv } = encrypt(value);
 
-      return prisma.credential.update({
-        where: { id },
+      const { encryptedValue, iv } = encrypt(input.apiKey);
+
+      return prisma.aiProviderProfile.update({
+        where: { id: input.id },
         data: {
-          name,
-          type,
-          encryptedValue,
+          name: input.name,
+          provider: input.provider,
+          baseURL: input.baseURL || null,
+          encryptedApiKey: encryptedValue,
           iv,
+          defaultModel: input.defaultModel || null,
+          enabled: input.enabled,
         },
       });
     }),
 
   getOne: protectedProcedure
     .input(z.object({ id: z.string() }))
-    .query(async ({ ctx, input }): Promise<CredentialWithValue | null> => {
-      const cred = await prisma.credential.findUnique({
+    .query(async ({ ctx, input }): Promise<AiProviderWithApiKey | null> => {
+      const profile = await prisma.aiProviderProfile.findUnique({
         where: {
           id: input.id,
         },
       });
-      if (!cred) return null;
+      if (!profile) return null;
+
       await requireWorkspaceRole({
         userId: ctx.auth.user.id,
-        workspaceId: cred.workspaceId,
+        workspaceId: profile.workspaceId,
         minRole: WorkspaceRole.VIEWER,
       });
+
       return {
-        id: cred.id,
-        name: cred.name,
-        type: cred.type,
-        createdAt: cred.createdAt,
-        updatedAt: cred.updatedAt,
-        userId: cred.userId,
-        workspaceId: cred.workspaceId,
-        encryptedValue: cred.encryptedValue,
-        iv: cred.iv,
-        keyVersion: cred.keyVersion,
-        value: decrypt(cred.encryptedValue, cred.iv),
+        id: profile.id,
+        name: profile.name,
+        provider: profile.provider,
+        baseURL: profile.baseURL,
+        defaultModel: profile.defaultModel,
+        enabled: profile.enabled,
+        createdAt: profile.createdAt,
+        updatedAt: profile.updatedAt,
+        userId: profile.userId,
+        workspaceId: profile.workspaceId,
+        apiKey: decrypt(profile.encryptedApiKey, profile.iv),
       };
     }),
+
   getMany: protectedProcedure
     .input(
       z.object({
@@ -157,40 +158,45 @@ export const credentialsRouter = createTRPCRouter({
         workspaceId,
         minRole: WorkspaceRole.VIEWER,
       });
+
+      const where = {
+        workspaceId,
+        name: {
+          contains: search,
+          mode: 'insensitive' as const,
+        },
+      };
+
       const [items, totalCount] = await Promise.all([
-        prisma.credential.findMany({
+        prisma.aiProviderProfile.findMany({
           skip: (page - 1) * pageSize,
           take: pageSize,
-          where: {
-            workspaceId,
-            name: {
-              contains: search,
-              mode: 'insensitive',
-            },
-          },
+          where,
           orderBy: {
             updatedAt: 'desc',
           },
           select: {
             id: true,
             name: true,
-            type: true,
+            provider: true,
+            baseURL: true,
+            defaultModel: true,
+            enabled: true,
             createdAt: true,
             updatedAt: true,
             userId: true,
             workspaceId: true,
           },
         }),
-        prisma.credential.count({
-          where: {
-            workspaceId,
-          },
+        prisma.aiProviderProfile.count({
+          where,
         }),
       ]);
+
       const totalPages = Math.ceil(totalCount / pageSize);
 
       return {
-        items: items as CredentialListItem[],
+        items: items as AiProviderListItem[],
         page,
         pageSize,
         totalCount,
@@ -199,27 +205,29 @@ export const credentialsRouter = createTRPCRouter({
         hasPreviousPage: page > 1,
       };
     }),
-  getByType: protectedProcedure
-    .input(z.object({ type: z.enum(CredentialType) }))
-    .query(async ({ ctx, input }) => {
-      const { type } = input;
-      await requireWorkspaceRole({
-        userId: ctx.auth.user.id,
+
+  getEnabled: protectedProcedure.query(async ({ ctx }) => {
+    await requireWorkspaceRole({
+      userId: ctx.auth.user.id,
+      workspaceId: ctx.workspaceId,
+      minRole: WorkspaceRole.VIEWER,
+    });
+
+    return prisma.aiProviderProfile.findMany({
+      where: {
         workspaceId: ctx.workspaceId,
-        minRole: WorkspaceRole.VIEWER,
-      });
-      return prisma.credential.findMany({
-        where: {
-          workspaceId: ctx.workspaceId,
-          type,
-        },
-        orderBy: {
-          updatedAt: 'desc',
-        },
-        select: {
-          id: true,
-          name: true,
-        },
-      });
-    }),
+        enabled: true,
+      },
+      orderBy: {
+        updatedAt: 'desc',
+      },
+      select: {
+        id: true,
+        name: true,
+        provider: true,
+        defaultModel: true,
+        baseURL: true,
+      },
+    });
+  }),
 });

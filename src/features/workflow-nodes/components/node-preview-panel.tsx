@@ -12,7 +12,7 @@ const previewKeys = [
   'method',
   'endpoint',
   'model',
-  'credentialId',
+  'providerProfileId',
   'webhookUrl',
   'content',
   'variable',

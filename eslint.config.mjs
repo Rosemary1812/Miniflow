@@ -24,7 +24,7 @@ const typeAwareConfigs = tseslint.configs.strictTypeChecked.map(config => ({
 
 export default tseslint.config(
   {
-    ignores: ['.next/**', 'node_modules/**'],
+    ignores: ['.next/**', 'node_modules/**', 'src/generated/**'],
   },
   js.configs.recommended,
   ...typeAwareConfigs,

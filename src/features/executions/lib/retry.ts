@@ -3,9 +3,7 @@ import { NodeType, RetryStrategy } from '@prisma/client';
 
 const retryableNodeTypes = new Set<NodeType>([
   NodeType.HTTP_REQUEST,
-  NodeType.OPENAI,
-  NodeType.ANTHROPIC,
-  NodeType.GEMINI,
+  NodeType.AI_TEXT,
   NodeType.DISCORD,
   NodeType.SLACK,
   NodeType.GOOGLE_FORM_TRIGGER,

@@ -304,10 +304,6 @@ export const workflowRouter = createTRPCRouter({
               retryStrategy: asRetryStrategy(data.retryStrategy) ?? undefined,
               retryBaseDelayMs: asNumber(data.retryBaseDelayMs, 1000),
               retryMaxDelayMs: asNumber(data.retryMaxDelayMs, 30000),
-              credentialId:
-                typeof data.credentialId === 'string' && data.credentialId
-                  ? data.credentialId
-                  : undefined,
             };
           }),
         });

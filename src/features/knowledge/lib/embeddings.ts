@@ -1,5 +1,5 @@
 import { createOpenAI } from '@ai-sdk/openai';
-import { CredentialType } from '@prisma/client';
+import { AiProviderKind } from '@prisma/client';
 import { embed, embedMany } from 'ai';
 import { NonRetriableError } from 'inngest';
 import prisma from '@/lib/db';
@@ -9,20 +9,26 @@ export const KNOWLEDGE_EMBEDDING_MODEL = 'text-embedding-3-small';
 export const KNOWLEDGE_EMBEDDING_DIMENSIONS = 1536;
 
 export const getOpenAIEmbeddingModel = async (workspaceId: string) => {
-  const credential = await prisma.credential.findFirst({
+  const providerProfile = await prisma.aiProviderProfile.findFirst({
     where: {
       workspaceId,
-      type: CredentialType.OPENAI,
+      provider: AiProviderKind.OPENAI_COMPATIBLE,
+      enabled: true,
     },
     orderBy: { updatedAt: 'desc' },
   });
 
-  if (!credential) {
-    throw new NonRetriableError('OpenAI credential is required to embed knowledge documents');
+  if (!providerProfile) {
+    throw new NonRetriableError(
+      'An enabled OpenAI-compatible provider profile is required to embed knowledge documents',
+    );
   }
 
-  const apiKey = decrypt(credential.encryptedValue, credential.iv);
-  const openai = createOpenAI({ apiKey });
+  const apiKey = decrypt(providerProfile.encryptedApiKey, providerProfile.iv);
+  const openai = createOpenAI({
+    apiKey,
+    ...(providerProfile.baseURL && { baseURL: providerProfile.baseURL }),
+  });
   return openai.embedding(KNOWLEDGE_EMBEDDING_MODEL);
 };
 

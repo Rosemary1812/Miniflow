@@ -19,7 +19,7 @@ model User {
   sessions                Session[]
   accounts                Account[]
   workflows               Workflow[]
-  credentials             Credential[]
+  aiProviderProfiles      AiProviderProfile[]
   defaultWorkspaceId      String?
   defaultWorkspace        Workspace?           @relation("DefaultWorkspace", fields: [defaultWorkspaceId], references: [id])
   ownedWorkspaces         Workspace[]          @relation("WorkspaceOwner")
@@ -89,31 +89,29 @@ model Verification {
   @@map("verification")
 }
 
-model Credential {
-  id             String         @id @default(cuid())
-  workspaceId    String
-  workspace      Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  name           String
-  encryptedValue String // AES-256-GCM encrypted API key
-  iv             String // Initialization vector (16 bytes hex)
-  keyVersion     Int            @default(1) // Encryption key version for rotation
-  type           CredentialType
+model AiProviderProfile {
+  id              String         @id @default(cuid())
+  workspaceId     String
+  workspace       Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name            String
+  provider        AiProviderKind
+  baseURL         String?
+  encryptedApiKey String
+  iv              String
+  keyVersion      Int            @default(1)
+  defaultModel    String?
+  enabled         Boolean        @default(true)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  userId          String
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  Node Node[]
-
-  // Hide plaintext value from Prisma queries by default
   @@index([workspaceId])
-  @@map("credential")
+  @@index([userId])
 }
 
-enum CredentialType {
-  OPENAI
+enum AiProviderKind {
+  OPENAI_COMPATIBLE
   ANTHROPIC
   GEMINI
 }
@@ -148,9 +146,7 @@ enum NodeType {
   HTTP_REQUEST
   GOOGLE_FORM_TRIGGER
   STRIPE_TRIGGER
-  ANTHROPIC
-  GEMINI
-  OPENAI
+  AI_TEXT
   DISCORD
   SLACK
   IF_BRANCH
@@ -168,6 +164,8 @@ enum KnowledgeDocumentStatus {
 
 enum KnowledgeSourceType {
   TEXT
+  MARKDOWN
+  PDF
 }
 
 enum EmbeddingProvider {
@@ -220,8 +218,6 @@ model Node {
 
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
-  credential   Credential? @relation(fields: [credentialId], references: [id])
-  credentialId String?
 }
 
 model Connection {
@@ -284,7 +280,7 @@ model Workspace {
   members            WorkspaceMember[]
   invites            WorkspaceInvite[]
   workflows          Workflow[]
-  credentials        Credential[]
+  aiProviderProfiles AiProviderProfile[]
   executions         Execution[]
   scheduledWorkflows ScheduledWorkflow[]
   mcpServers         McpServer[]
@@ -317,6 +313,9 @@ model KnowledgeDocument {
   title           String
   sourceType      KnowledgeSourceType     @default(TEXT)
   sourceText      String                  @db.Text
+  sourceData      String?                 @db.Text
+  originalName    String?
+  mimeType        String?
   status          KnowledgeDocumentStatus @default(PENDING)
   error           String?                 @db.Text
   chunkCount      Int                     @default(0)

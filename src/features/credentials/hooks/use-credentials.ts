@@ -1,77 +1,70 @@
-// Hooks to fetch all workflows using suspense
-
 import { useTRPC } from '@/app/trpc/client';
 import { useSuspenseQuery, useQueryClient, useMutation, useQuery } from '@tanstack/react-query';
-import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { useCredentialsParams } from './use-credentials-params';
-import { CredentialType } from '@prisma/client';
 
-export const useSuspenseCredentials = () => {
+export const useSuspenseAiProviders = () => {
   const trpc = useTRPC();
-  const [params] = useCredentialsParams(); //TODO
-  return useSuspenseQuery(trpc.credentials.getMany.queryOptions(params));
+  const [params] = useCredentialsParams();
+  return useSuspenseQuery(trpc.aiProviders.getMany.queryOptions(params));
 };
 
-//Hooks to create a new credential
-
-export const useCreateCredential = () => {
+export const useCreateAiProvider = () => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   return useMutation(
-    trpc.credentials.create.mutationOptions({
+    trpc.aiProviders.create.mutationOptions({
       onSuccess: data => {
-        toast.success(`Credential "${data.name}" created successfully`);
-        queryClient.invalidateQueries(trpc.credentials.getMany.queryOptions({}));
+        toast.success(`Provider "${data.name}" created successfully`);
+        queryClient.invalidateQueries(trpc.aiProviders.getMany.queryOptions({}));
+        queryClient.invalidateQueries(trpc.aiProviders.getEnabled.queryOptions());
       },
       onError: error => {
-        toast.error(`Failed to create credential: ${error.message}`);
+        toast.error(`Failed to create provider: ${error.message}`);
       },
     }),
   );
 };
-//  hook to remove a credential
-export const useRemoveCredential = () => {
+
+export const useRemoveAiProvider = () => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   return useMutation(
-    trpc.credentials.remove.mutationOptions({
+    trpc.aiProviders.remove.mutationOptions({
       onSuccess: data => {
-        toast.success(`Credential "${data.name}" removed successfully`);
-        queryClient.invalidateQueries(trpc.credentials.getMany.queryOptions({}));
-        queryClient.invalidateQueries(trpc.credentials.getOne.queryFilter({ id: data.id }));
+        toast.success(`Provider "${data.name}" removed successfully`);
+        queryClient.invalidateQueries(trpc.aiProviders.getMany.queryOptions({}));
+        queryClient.invalidateQueries(trpc.aiProviders.getOne.queryFilter({ id: data.id }));
+        queryClient.invalidateQueries(trpc.aiProviders.getEnabled.queryOptions());
       },
-      // onError: error => {
-      //   toast.error(`Failed to remove credential: ${error.message}`);
-      // },
     }),
   );
 };
 
-export const useSuspenseCredential = (id: string) => {
+export const useSuspenseAiProvider = (id: string) => {
   const trpc = useTRPC();
-  return useSuspenseQuery(trpc.credentials.getOne.queryOptions({ id }));
+  return useSuspenseQuery(trpc.aiProviders.getOne.queryOptions({ id }));
 };
 
-// Hook to update  a credential
-export const useUpdateCredential = () => {
+export const useUpdateAiProvider = () => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   return useMutation(
-    trpc.credentials.update.mutationOptions({
+    trpc.aiProviders.update.mutationOptions({
       onSuccess: data => {
-        toast.success(`Credential "${data.name}" saved`);
-        queryClient.invalidateQueries(trpc.credentials.getMany.queryOptions({}));
-        queryClient.invalidateQueries(trpc.credentials.getOne.queryOptions({ id: data.id }));
+        toast.success(`Provider "${data.name}" saved`);
+        queryClient.invalidateQueries(trpc.aiProviders.getMany.queryOptions({}));
+        queryClient.invalidateQueries(trpc.aiProviders.getOne.queryOptions({ id: data.id }));
+        queryClient.invalidateQueries(trpc.aiProviders.getEnabled.queryOptions());
       },
       onError: error => {
-        toast.error(`Failed to save credential: ${error.message}`);
+        toast.error(`Failed to save provider: ${error.message}`);
       },
     }),
   );
 };
 
-export const useCredentialsByType = (type: CredentialType) => {
+export const useEnabledAiProviders = () => {
   const trpc = useTRPC();
-  return useQuery(trpc.credentials.getByType.queryOptions({ type }));
+  return useQuery(trpc.aiProviders.getEnabled.queryOptions());
 };

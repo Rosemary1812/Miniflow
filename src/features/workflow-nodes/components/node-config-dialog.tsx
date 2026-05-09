@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import type { Node } from '@xyflow/react';
-import { CredentialType, NodeType, RetryStrategy } from '@prisma/client';
+import { NodeType, RetryStrategy } from '@prisma/client';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -22,7 +22,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { CredentialSelect } from './credential-select';
+import { ProviderProfileSelect } from './provider-profile-select';
 import { NodePreviewPanel } from './node-preview-panel';
 import { PromptTemplateEditor } from './prompt-template-editor';
 import { RetryConfigPanel, type RetryConfigFormValue } from './retry-config-panel';
@@ -38,20 +38,12 @@ type Props = {
 
 const retryableTypes = new Set<string>([
   NodeType.HTTP_REQUEST,
-  NodeType.OPENAI,
-  NodeType.ANTHROPIC,
-  NodeType.GEMINI,
+  NodeType.AI_TEXT,
   NodeType.DISCORD,
   NodeType.SLACK,
   NodeType.GOOGLE_FORM_TRIGGER,
   NodeType.STRIPE_TRIGGER,
 ]);
-
-const aiCredentialTypes: Partial<Record<NodeType, CredentialType>> = {
-  [NodeType.OPENAI]: CredentialType.OPENAI,
-  [NodeType.ANTHROPIC]: CredentialType.ANTHROPIC,
-  [NodeType.GEMINI]: CredentialType.GEMINI,
-};
 
 const conditionOperators = [
   { value: 'equals', label: 'Equals (==)' },
@@ -69,9 +61,7 @@ const conditionOperators = [
 
 const configurableTypes: NodeType[] = [
   NodeType.HTTP_REQUEST,
-  NodeType.OPENAI,
-  NodeType.ANTHROPIC,
-  NodeType.GEMINI,
+  NodeType.AI_TEXT,
   NodeType.SLACK,
   NodeType.DISCORD,
   NodeType.IF_BRANCH,
@@ -99,9 +89,8 @@ const getDefaultData = (node: Node | null): NodeConfigData => {
     endpoint: asString(data.endpoint),
     method: asString(data.method, 'GET'),
     body: asString(data.body),
-    credentialId: asString(data.credentialId),
+    providerProfileId: asString(data.providerProfileId),
     model: asString(data.model),
-    baseURL: asString(data.baseURL),
     systemPrompt: asString(data.systemPrompt),
     userPrompt: asString(data.userPrompt),
     webhookUrl: asString(data.webhookUrl),
@@ -138,12 +127,10 @@ export const NodeConfigDialog = ({ node, open, onOpenChange, onSubmit }: Props) 
     }
   }, [node, open]);
 
-  const credentialType = nodeType ? aiCredentialTypes[nodeType] : undefined;
   const canRetry = nodeType ? retryableTypes.has(nodeType) : false;
   const operator = asString(data.operator, 'equals');
   const showBranchValue = !['isEmpty', 'isNotEmpty'].includes(operator);
-  const isPromptNode =
-    nodeType === NodeType.OPENAI || nodeType === NodeType.ANTHROPIC || nodeType === NodeType.GEMINI;
+  const isPromptNode = nodeType === NodeType.AI_TEXT;
 
   const title = useMemo(() => {
     if (!nodeType) {
@@ -248,16 +235,13 @@ export const NodeConfigDialog = ({ node, open, onOpenChange, onSubmit }: Props) 
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Credential</Label>
-                    {credentialType ? (
-                      <CredentialSelect
-                        type={credentialType}
-                        value={asString(data.credentialId) || undefined}
-                        onChange={credentialId =>
-                          setData(setField(data, 'credentialId', credentialId))
-                        }
-                      />
-                    ) : null}
+                    <Label>Provider Profile</Label>
+                    <ProviderProfileSelect
+                      value={asString(data.providerProfileId) || undefined}
+                      onChange={providerProfileId =>
+                        setData(setField(data, 'providerProfileId', providerProfileId))
+                      }
+                    />
                   </div>
                 </div>
                 <div className="grid gap-3 md:grid-cols-2">
@@ -269,16 +253,6 @@ export const NodeConfigDialog = ({ node, open, onOpenChange, onSubmit }: Props) 
                       placeholder="Use provider default"
                     />
                   </div>
-                  {nodeType === NodeType.OPENAI ? (
-                    <div className="space-y-2">
-                      <Label>Base URL</Label>
-                      <Input
-                        value={asString(data.baseURL)}
-                        onChange={event => setData(setField(data, 'baseURL', event.target.value))}
-                        placeholder="https://api.openai.com/v1"
-                      />
-                    </div>
-                  ) : null}
                 </div>
                 <PromptTemplateEditor
                   label="System prompt"

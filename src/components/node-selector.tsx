@@ -9,6 +9,7 @@ import {
   ClockIcon,
   PlugIcon,
   SearchIcon,
+  BotIcon,
 } from 'lucide-react';
 
 import { useCallback } from 'react';
@@ -84,22 +85,10 @@ const excutionNodes: NodeTypeOption[] = [
   },
 
   {
-    type: NodeType.GEMINI,
-    label: 'Gemini',
-    description: 'Use Gemini to generate text.',
-    icon: '/logos/gemini.svg',
-  },
-  {
-    type: NodeType.OPENAI,
-    label: 'OpenAI',
-    description: 'Use OpenAI to generate text.',
-    icon: '/logos/openai.svg',
-  },
-  {
-    type: NodeType.ANTHROPIC,
-    label: 'Anthropic',
-    description: 'Use Anthropic to generate text.',
-    icon: '/logos/anthropic.svg',
+    type: NodeType.AI_TEXT,
+    label: 'AI Text',
+    description: 'Generate text with a configured provider profile.',
+    icon: BotIcon,
   },
   {
     type: NodeType.DISCORD,

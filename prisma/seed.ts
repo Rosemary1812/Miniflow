@@ -24,11 +24,12 @@ const PRESET_TEMPLATES = [
       },
       {
         id: 'gemini',
-        type: NodeType.GEMINI,
+        type: NodeType.AI_TEXT,
         position: { x: 500, y: 0 },
         data: {
           variableName: 'summary',
-          userPrompt: 'Summarize the following article in 3 bullet points:\n\n{{article.httpResponse.data}}',
+          userPrompt:
+            'Summarize the following article in 3 bullet points:\n\n{{article.httpResponse.data}}',
         },
       },
     ],
@@ -42,9 +43,27 @@ const PRESET_TEMPLATES = [
     description: 'Send a daily status update to Slack with AI-generated summary',
     category: 'social',
     nodes: [
-      { id: 'schedule', type: NodeType.SCHEDULE_TRIGGER, position: { x: 0, y: 0 }, data: { cron: '0 9 * * *', timezone: 'UTC' } },
-      { id: 'gemini', type: NodeType.GEMINI, position: { x: 250, y: 0 }, data: { variableName: 'summary', userPrompt: 'Generate a brief daily standup summary from recent data' } },
-      { id: 'slack', type: NodeType.SLACK, position: { x: 500, y: 0 }, data: { channel: '#general', message: '{{summary.response}}' } },
+      {
+        id: 'schedule',
+        type: NodeType.SCHEDULE_TRIGGER,
+        position: { x: 0, y: 0 },
+        data: { cron: '0 9 * * *', timezone: 'UTC' },
+      },
+      {
+        id: 'gemini',
+        type: NodeType.AI_TEXT,
+        position: { x: 250, y: 0 },
+        data: {
+          variableName: 'summary',
+          userPrompt: 'Generate a brief daily standup summary from recent data',
+        },
+      },
+      {
+        id: 'slack',
+        type: NodeType.SLACK,
+        position: { x: 500, y: 0 },
+        data: { channel: '#general', message: '{{summary.response}}' },
+      },
     ],
     edges: [
       { source: 'schedule', target: 'gemini', sourceHandle: null, targetHandle: null },
@@ -57,11 +76,14 @@ const PRESET_TEMPLATES = [
     category: 'automation',
     nodes: [
       { id: 'manual', type: NodeType.MANUAL_TRIGGER, position: { x: 0, y: 0 }, data: {} },
-      { id: 'discord', type: NodeType.DISCORD, position: { x: 250, y: 0 }, data: { message: 'Alert received from workflow' } },
+      {
+        id: 'discord',
+        type: NodeType.DISCORD,
+        position: { x: 250, y: 0 },
+        data: { message: 'Alert received from workflow' },
+      },
     ],
-    edges: [
-      { source: 'manual', target: 'discord', sourceHandle: null, targetHandle: null },
-    ],
+    edges: [{ source: 'manual', target: 'discord', sourceHandle: null, targetHandle: null }],
   },
   {
     name: 'AI Content Filter',
@@ -77,11 +99,12 @@ const PRESET_TEMPLATES = [
       },
       {
         id: 'gemini',
-        type: NodeType.GEMINI,
+        type: NodeType.AI_TEXT,
         position: { x: 250, y: 200 },
         data: {
           variableName: 'sentiment',
-          userPrompt: 'Classify the sentiment of this text as positive, negative, or neutral: {{content.httpResponse.data}}',
+          userPrompt:
+            'Classify the sentiment of this text as positive, negative, or neutral: {{content.httpResponse.data}}',
         },
       },
       {

@@ -13,45 +13,43 @@ import {
   LoadingView,
 } from '@/components/entity-components';
 import {
-  useCreateCredential,
-  useRemoveCredential,
-  useSuspenseCredentials,
+  useRemoveAiProvider,
+  useSuspenseAiProviders,
 } from '@/features/credentials/hooks/use-credentials';
 import { useRouter } from 'next/navigation';
 import { useCredentialsParams } from '../hooks/use-credentials-params';
-import  { useEntitySearch } from '@/hooks/use-entity-search';
-import { CredentialType } from '@prisma/client';
+import { useEntitySearch } from '@/hooks/use-entity-search';
+import { AiProviderKind } from '@prisma/client';
 import Image from 'next/image';
 
-// Type for list items (no sensitive fields)
-type CredentialListItem = {
+type AiProviderListItem = {
   id: string;
   name: string;
-  type: CredentialType;
+  provider: AiProviderKind;
+  baseURL: string | null;
+  defaultModel: string | null;
+  enabled: boolean;
   createdAt: Date;
   updatedAt: Date;
   userId: string;
 };
 
-// import type { Credential } from '@/generated/prisma/browser';
-// import { CredentialIcon } from 'lucide-react';
-
 export const CredentialSearch = () => {
   const [params, setParams] = useCredentialsParams();
   const { searchValue, onSearchChange } = useEntitySearch({ params, setParams });
   return (
-    <EntitySearch value={searchValue} onChange={onSearchChange} placeholder="Search credentials" />
+    <EntitySearch value={searchValue} onChange={onSearchChange} placeholder="Search providers" />
   );
 };
 
 export const CredentialsList = () => {
-  const credentials = useSuspenseCredentials();
+  const providers = useSuspenseAiProviders();
 
   return (
     <EntityList
-      items={credentials.data.items}
-      getKey={credential => credential.id}
-      renderItem={credential => <CredentialItem data={credential} />}
+      items={providers.data.items}
+      getKey={provider => provider.id}
+      renderItem={provider => <CredentialItem data={provider} />}
       emptyView={<CredentialsEmpty />}
     />
   );
@@ -60,24 +58,24 @@ export const CredentialsList = () => {
 export const CredentialsHeader = ({ disabled }: { disabled?: boolean }) => {
   return (
     <EntityHeader
-      title="Credentials"
-      description="Create and manage your credentials"
-      newBottonLabel="New Credential"
-      newBottonHref="/credentials/new"
+      title="Provider Profiles"
+      description="Create and manage reusable AI provider connections"
+      newBottonLabel="New Provider"
+      newBottonHref="/providers/new"
       disabled={disabled}
     />
   );
 };
 
 export const CredentialsPagination = () => {
-  const credentials = useSuspenseCredentials();
+  const providers = useSuspenseAiProviders();
   const [params, setParams] = useCredentialsParams();
 
   return (
     <EntityPagination
-      disabled={credentials.isFetching}
-      totalPages={credentials.data.totalPages}
-      page={credentials.data.page}
+      disabled={providers.isFetching}
+      totalPages={providers.data.totalPages}
+      page={providers.data.page}
       onPageChange={page => setParams({ ...params, page })}
     />
   );
@@ -96,55 +94,65 @@ export const CredentialsContainer = ({ children }: { children: React.ReactNode }
 };
 
 export const CredentialsLoading = () => {
-  return <LoadingView message="Loading credentials..." />;
+  return <LoadingView message="Loading providers..." />;
 };
 
 export const CredentialsError = () => {
-  return <ErrorView message="Error loading credentials..." />;
+  return <ErrorView message="Error loading providers..." />;
 };
+
 export const CredentialsEmpty = () => {
   const router = useRouter();
   const handleCreate = () => {
-    router.push(`/credentials/new`);
+    router.push(`/providers/new`);
   };
   return (
     <EmptyView
       onNew={handleCreate}
-      message="No credentials found. Get started by creating a credential"
+      message="No providers found. Create a provider profile to use AI nodes."
     />
   );
 };
 
-const credentialLogos: Record<CredentialType, string> = {
-  [CredentialType.OPENAI]: '/logos/openai.svg',
-  [CredentialType.ANTHROPIC]: '/logos/anthropic.svg',
-  [CredentialType.GEMINI]: '/logos/gemini.svg',
+const providerLogos: Record<AiProviderKind, string> = {
+  [AiProviderKind.OPENAI_COMPATIBLE]: '/logos/openai.svg',
+  [AiProviderKind.ANTHROPIC]: '/logos/anthropic.svg',
+  [AiProviderKind.GEMINI]: '/logos/gemini.svg',
 };
 
-export const CredentialItem = ({ data }: { data: CredentialListItem }) => {
-  const removeCredential = useRemoveCredential();
+const providerLabels: Record<AiProviderKind, string> = {
+  [AiProviderKind.OPENAI_COMPATIBLE]: 'OpenAI-compatible',
+  [AiProviderKind.ANTHROPIC]: 'Anthropic',
+  [AiProviderKind.GEMINI]: 'Gemini',
+};
+
+export const CredentialItem = ({ data }: { data: AiProviderListItem }) => {
+  const removeProvider = useRemoveAiProvider();
   const handleRemove = () => {
-    removeCredential.mutate({ id: data.id });
+    removeProvider.mutate({ id: data.id });
   };
 
-  const logo = credentialLogos[data.type] || '/logos/openai.svg';
+  const modelLabel = data.defaultModel ? ` • ${data.defaultModel}` : '';
+  const statusLabel = data.enabled ? 'Enabled' : 'Disabled';
+
   return (
     <EntityItem
-      href={`/credentials/${data.id}`}
+      href={`/providers/${data.id}`}
       title={data.name}
       subtitle={
         <>
-          Updated {formatDistanceToNow(data.updatedAt, { addSuffix: true })}
-          {''} &bull;Created {formatDistanceToNow(data.createdAt, { addSuffix: true })}
+          {providerLabels[data.provider]}
+          {modelLabel} • {statusLabel} • Updated{' '}
+          {formatDistanceToNow(data.updatedAt, { addSuffix: true })}
         </>
       }
       image={
         <div className="size-8 flex items-center justify-center">
-          <Image src={logo} alt={data.type} width={20} height={20} />
+          <Image src={providerLogos[data.provider]} alt={data.provider} width={20} height={20} />
         </div>
       }
       onRemove={handleRemove}
-      isRemoving={removeCredential.isPending}
-    ></EntityItem>
+      isRemoving={removeProvider.isPending}
+    />
   );
 };
